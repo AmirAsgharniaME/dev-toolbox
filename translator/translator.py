@@ -32,31 +32,9 @@ MODEL_NAME = "gpt-4o-mini-2024-07-18"
 def notify(title, message):
     """Show desktop notification in Linux Mint Cinnamon."""
     try:
-        subprocess.run(["notify-send", "-t", "2000", title, message], check=False)
+        subprocess.run(["notify-send", "-t", "6000", title, message], check=False)
     except Exception:
         pass
-
-def get_selected_text():
-    """Retrieve highlighted text from the X11 primary selection."""
-    try:
-        res = subprocess.run(
-            ["xclip", "-o", "-selection", "primary"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            check=True
-        )
-        return res.stdout.strip()
-    except Exception:
-        return ""
-
-def replace_selected_text(new_text):
-    """Copy the refined text to clipboard and simulate Ctrl+V for in-place replacement."""
-    p = subprocess.Popen(["xclip", "-selection", "clipboard"], stdin=subprocess.PIPE, text=True)
-    p.communicate(input=new_text)
-    time.sleep(0.08)
-    # The --clearmodifiers flag prevents stuck modifier keys during shortcut execution
-    subprocess.run(["xdotool", "key", "--clearmodifiers", "ctrl+v"])
 
 def polish_ielts(raw_text):
     if not API_KEY:
@@ -95,29 +73,43 @@ def polish_ielts(raw_text):
     return result["choices"][0]["message"]["content"].strip()
 
 if __name__ == "__main__":
-    # Handle standard input (pipe mode) if connected
-    if not sys.stdin.isatty():
-        raw_text = sys.stdin.read().strip()
-        if raw_text:
-            try:
-                print(polish_ielts(raw_text))
-            except Exception as err:
-                sys.stderr.write(f"Error: {err}\n")
-                sys.exit(1)
+    # Determine the text to process:
+    # 1. First command line argument (passed from run_translator.sh)
+    # 2. Piped stdin
+    # 3. Fallback to primary selection
+    target_text = ""
+    if len(sys.argv) > 1 and sys.argv[1].strip():
+        target_text = sys.argv[1].strip()
+    elif not sys.stdin.isatty():
+        target_text = sys.stdin.read().strip()
+    else:
+        try:
+            res = subprocess.run(
+                ["xclip", "-o", "-selection", "primary"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=True
+            )
+            target_text = res.stdout.strip()
+        except Exception:
+            target_text = ""
+
+    if not target_text:
+        notify("Translator / Polisher", "Clipboard is empty! Copy some text first.")
         sys.exit(0)
 
-    # Otherwise, run in GUI shortcut mode using highlighted text
-    selected = get_selected_text()
-    if not selected:
-        notify("Translator / Polisher", "No text selected.")
-        sys.exit(0)
-
-    notify("Translator / Polisher", "Polishing and elevating text...")
+    notify("Translator / Polisher", "Translating / Polishing...")
     try:
-        refined = polish_ielts(selected)
-        replace_selected_text(refined)
+        refined = polish_ielts(target_text)
+        # Update clipboard with the result
+        p = subprocess.Popen(["xclip", "-selection", "clipboard"], stdin=subprocess.PIPE, text=True)
+        p.communicate(input=refined)
+        
+        # Display the result in a notification
+        notify("Translation Result", refined)
+        print(refined)
     except Exception as err:
         notify("Translator - Error", str(err))
         sys.stderr.write(f"Error: {err}\n")
         sys.exit(1)
-

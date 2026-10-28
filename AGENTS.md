@@ -17,7 +17,7 @@ For direct execution, use `chmod +x prompt_picker.sh` once, then `./prompt_picke
 
 Run the prompt helper with `bash prompt_helper/prompt_helper.sh`. It needs Zenity, Python 3 with the `requests` package, `xclip`, and `xdotool`. The refiner reads `GAPGPT_API_KEY` first; if it is unset or empty, it reads the key from `prompt_helper/.gapgpt_key`. Keep that local key file private and out of version control. Check its Bash syntax with `bash -n prompt_helper/prompt_helper.sh`.
 
-Run the translator with `bash translator/run_translator.sh`. It needs Python 3 with `requests`, `xclip`, `xdotool`, and `notify-send` in an X11 session. The script reads `GAPGPT_API_KEY` first, then `translator/.api_translator`; keep that local key file private and out of version control. It accepts piped text and prints the polished result, or reads selected text and replaces it in the active window. Check its launcher syntax with `bash -n translator/run_translator.sh`.
+Run the translator with `bash translator/run_translator.sh`. The launcher reads text from the X11 clipboard and passes it to the Python script, which sends the polished result to standard output, copies it to the clipboard, and shows desktop notifications. The launcher needs Python 3, `xclip`, and `notify-send`; the Python script needs `requests` and `xclip` for its primary-selection fallback and clipboard output. Piped text and a command-line argument are also supported when running `translator/translator.py` directly. The script reads `GAPGPT_API_KEY` first, then `translator/.api_translator`; keep that local key file private and out of version control. Check its launcher syntax with `bash -n translator/run_translator.sh`.
 
 ## Coding Style & Naming Conventions
 

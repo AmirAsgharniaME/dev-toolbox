@@ -1,23 +1,15 @@
-#!/usr/bin/env bash
-
-# Resolve the absolute path of this script's directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# Target python script
-PYTHON_SCRIPT="$SCRIPT_DIR/translator.py"
-
-# Ensure environment variables for X11 / Cinnamon display are loaded
+#!/bin/bash
 export DISPLAY="${DISPLAY:-:0}"
 export XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}"
+export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
 
-# Check required system utilities
-for cmd in xclip xdotool notify-send python3; do
-    if ! command -v "$cmd" &>/dev/null; then
-        notify-send -t 3000 "Translator Error" "Missing dependency: $cmd"
-        exit 1
-    fi
-done
+# Read text from clipboard (Ctrl + C)
+TEXT=$(/usr/bin/xclip -selection clipboard -o 2>/dev/null)
 
-# Run the python script
-python3 "$PYTHON_SCRIPT"
+if [ -z "$TEXT" ]; then
+    /usr/bin/notify-send "AI Translator" "Clipboard is empty! Copy some text first." -u low
+    exit 0
+fi
 
+# Pass the copied text directly to the Python translator engine
+/usr/bin/python3 /home/amir/Documents/dev-toolbox/translator/translator.py "$TEXT"

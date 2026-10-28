@@ -1,6 +1,6 @@
 # dev-toolbox
 
-Small desktop utilities for building coding prompts and working with project files on a Linux desktop. The repository currently includes a Rofi based project and Git prompt picker, plus a Zenity dialog that refines prompts through the GapGPT API.
+Small desktop utilities for building coding prompts and working with project files on a Linux desktop. The repository includes a Rofi based project and Git prompt picker, a Zenity dialog that refines prompts through the GapGPT API, and a text translator and polisher for Linux desktop workflows.
 
 ## Tools
 
@@ -16,6 +16,12 @@ See [`prompt_picker/README.md`](prompt_picker/README.md) for setup, requirements
 
 The refiner reads `GAPGPT_API_KEY` from the environment, or falls back to `prompt_helper/.gapgpt_key`. Keep that local key file private and do not commit it. See [`prompt_helper/README.md`](prompt_helper/README.md) for requirements and usage details.
 
+### Translator
+
+[`translator/run_translator.sh`](translator/run_translator.sh) launches [`translator/translator.py`](translator/translator.py). With text selected in an X11 application, it translates Persian or mixed text into polished academic English, or improves English text, then replaces the selection. It also accepts piped text and writes the result to standard output.
+
+The translator needs Python 3, `requests`, `xclip`, `xdotool`, and `notify-send`. It reads `GAPGPT_API_KEY` from the environment or falls back to `translator/.api_translator`; keep that local key file private and do not commit it. See [`translator/README.md`](translator/README.md) for setup and usage details.
+
 ## Requirements
 
 - Bash 4 or later
@@ -23,16 +29,18 @@ The refiner reads `GAPGPT_API_KEY` from the environment, or falls back to `promp
 - Rofi and `xdotool` for the full Prompt Picker flow
 - Zenity, Python 3, `requests`, `xclip`, and `xdotool` for Prompt Helper
 - A GapGPT API key to refine prompts with Prompt Helper
+- Python 3, `requests`, `xclip`, `xdotool`, `notify-send`, and a GapGPT API key for Translator
 
 The Prompt Picker also supports `xsel` as a clipboard alternative. `xprop` and `notify-send` are optional; details and graceful fallback behavior are documented in its README.
 
 ## Run
 
-Run either script with Bash from the repository root:
+Run a utility with Bash from the repository root:
 
 ```bash
 bash prompt_picker/prompt_picker.sh
 bash prompt_helper/prompt_helper.sh
+bash translator/run_translator.sh
 ```
 
 Alternatively, make a script executable with `chmod +x` and run it directly. The Prompt Helper currently invokes its Python script using the repository's absolute path, so it expects this project at `/home/amir/Documents/dev-toolbox` unless that script is adjusted.

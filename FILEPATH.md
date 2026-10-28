@@ -10,6 +10,7 @@ MD | Agents | AGENTS.md
 MD | Filepath | FILEPATH.md
 MD | Readme | prompt_picker/README.md
 MD | Readme | prompt_helper/README.md
+MD | Readme | translator/README.md
 
 # Config
 CFG | Gitignore | .gitignore
@@ -17,6 +18,8 @@ CFG | Gitignore | .gitignore
 # Shell Script
 SH | Prompt Picker | prompt_picker/prompt_picker.sh
 SH | Prompt Helper | prompt_helper/prompt_helper.sh
+SH | Run Translator | translator/run_translator.sh
 
 # Python Script
 PY | Refine Prompt | prompt_helper/refine_prompt.py
+PY | Translator | translator/translator.py

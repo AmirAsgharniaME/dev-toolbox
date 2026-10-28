@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This repository contains standalone Bash desktop utilities. `prompt_picker/prompt_picker.sh` is the Rofi picker, with setup and usage notes in `prompt_picker/README.md`. `prompt_helper/prompt_helper.sh` opens a Zenity prompt and uses `prompt_helper/refine_prompt.py` to refine it through the GapGPT API. The root `README.md` gives the project overview; `LICENSE` contains licensing terms. The root `FILEPATH.md` is the pipe-separated project inventory (`TYPE | LABEL | PATH`), used to populate file menus and prompts. Keep it synchronized with project files as described below. There is no separate source, asset, or test tree at present.
+This repository contains standalone Linux desktop utilities. `prompt_picker/prompt_picker.sh` is the Rofi picker, with setup and usage notes in `prompt_picker/README.md`. `prompt_helper/prompt_helper.sh` opens a Zenity prompt and uses `prompt_helper/refine_prompt.py` to refine it through the GapGPT API. `translator/run_translator.sh` launches `translator/translator.py`, which polishes selected or piped text through the GapGPT API. The root `README.md` gives the project overview; `LICENSE` contains licensing terms. The root `FILEPATH.md` is the pipe-separated project inventory (`TYPE | LABEL | PATH`), used to populate file menus and prompts. Keep it synchronized with project files as described below. There is no separate asset or test tree at present.
 
 ## Build, Test, and Development Commands
 
@@ -17,9 +17,11 @@ For direct execution, use `chmod +x prompt_picker.sh` once, then `./prompt_picke
 
 Run the prompt helper with `bash prompt_helper/prompt_helper.sh`. It needs Zenity, Python 3 with the `requests` package, `xclip`, and `xdotool`. The refiner reads `GAPGPT_API_KEY` first; if it is unset or empty, it reads the key from `prompt_helper/.gapgpt_key`. Keep that local key file private and out of version control. Check its Bash syntax with `bash -n prompt_helper/prompt_helper.sh`.
 
+Run the translator with `bash translator/run_translator.sh`. It needs Python 3 with `requests`, `xclip`, `xdotool`, and `notify-send` in an X11 session. The script reads `GAPGPT_API_KEY` first, then `translator/.api_translator`; keep that local key file private and out of version control. It accepts piped text and prints the polished result, or reads selected text and replaces it in the active window. Check its launcher syntax with `bash -n translator/run_translator.sh`.
+
 ## Coding Style & Naming Conventions
 
-Keep shell code compatible with Bash 4+, use four spaces for indentation, quote expansions, and prefer small functions with descriptive `snake_case` names. Preserve the script’s existing checks for optional desktop utilities so it can degrade gracefully when they are missing.
+Keep shell code compatible with Bash 4+, use four spaces for indentation, quote expansions, and prefer small functions with descriptive `snake_case` names. Keep Python code compatible with the Python 3 version available on supported Linux desktops. Preserve existing checks and fallback behavior for desktop utilities where present.
 
 ## Keeping README Files Current
 

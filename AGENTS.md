@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This repository contains a standalone Bash/Rofi toolkit. The main utility is `prompt_picker/prompt_picker.sh`, with setup and usage notes in `prompt_picker/README.md`. The root `README.md` gives the project overview; `LICENSE` contains licensing terms. The root `file_path` is the picker’s pipe-separated project inventory (`TYPE | LABEL | PATH`), used to populate file menus and prompts. Keep it synchronized with project files as described below. There is no separate source, asset, or test tree at present.
+This repository contains a standalone Bash/Rofi toolkit. The main utility is `prompt_picker/prompt_picker.sh`, with setup and usage notes in `prompt_picker/README.md`. The root `README.md` gives the project overview; `LICENSE` contains licensing terms. The root `file_path.md` is the picker’s pipe-separated project inventory (`TYPE | LABEL | PATH`), used to populate file menus and prompts. Keep it synchronized with project files as described below. There is no separate source, asset, or test tree at present.
 
 ## Build, Test, and Development Commands
 
@@ -19,9 +19,9 @@ For direct execution, use `chmod +x prompt_picker.sh` once, then `./prompt_picke
 
 Keep shell code compatible with Bash 4+, use four spaces for indentation, quote expansions, and prefer small functions with descriptive `snake_case` names. Preserve the script’s existing checks for optional desktop utilities so it can degrade gracefully when they are missing.
 
-## Keeping `file_path` Synchronized
+## Keeping `file_path.md` Synchronized
 
-Check and update the root `file_path` in the same change whenever a project file is added, deleted, renamed, moved, or changes file type. Add one entry for each new or changed project file using `TYPE | LABEL | PATH`; remove stale entries for deleted or old paths, and replace them with the current entry. Keep paths exact and relative to the repository root. Choose the type from the inventory’s `# TYPES` list (for example, `MD` for Markdown and `SH` for shell scripts); when an extension or role changes, update the type too. If a file needs a type not yet listed, add an appropriate type to `# TYPES` and document the convention here. Use the inventory’s mechanical filename-to-title label rule, retain its section headers, and place entries under the matching section. Before finishing, compare the inventory against the project files so no changed path remains stale. Include `AGENTS.md` in the inventory.
+Check and update the root `file_path.md` in the same change whenever a project file is added, deleted, renamed, moved, or changes file type. Add one entry for each new or changed project file using `TYPE | LABEL | PATH`; remove stale entries for deleted or old paths, and replace them with the current entry. Keep paths exact and relative to the repository root. Choose the type from the inventory’s `# TYPES` list (for example, `MD` for Markdown and `SH` for shell scripts); when an extension or role changes, update the type too. If a file needs a type not yet listed, add an appropriate type to `# TYPES` and document the convention here. Use the inventory’s mechanical filename-to-title label rule, retain its section headers, and place entries under the matching section. Before finishing, compare the inventory against the project files so no changed path remains stale. Include `AGENTS.md` in the inventory.
 
 ## Testing Guidelines
 
@@ -33,4 +33,4 @@ Git history currently contains only the initial commit, so no commit-message con
 
 ## Keeping This Guide Current
 
-For every project change, check this `AGENTS.md` and `file_path` as part of the same work. Update this guide whenever the change adds or alters project structure, build or test commands, dependencies, coding conventions, or contribution workflows. Update `file_path` for every project file addition, deletion, rename, move, or type change, following the rules above. Keep both accurate for the repository after the change; do not finish a change while either file contains stale guidance or paths.
+For every project change, check this `AGENTS.md` and `file_path.md` as part of the same work. Update this guide whenever the change adds or alters project structure, build or test commands, dependencies, coding conventions, or contribution workflows. Update `file_path.md` for every project file addition, deletion, rename, move, or type change, following the rules above. Keep both accurate for the repository after the change; do not finish a change while either file contains stale guidance or paths.

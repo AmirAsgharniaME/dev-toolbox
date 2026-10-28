@@ -7,6 +7,7 @@
 MD | License | LICENSE
 MD | Readme | README.md
 MD | Agents | AGENTS.md
+MD | File Path | file_path.md
 MD | Readme | prompt_picker/README.md
 
 # Shell Script

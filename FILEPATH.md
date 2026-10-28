@@ -11,6 +11,9 @@ MD | Filepath | FILEPATH.md
 MD | Readme | prompt_picker/README.md
 MD | Readme | prompt_helper/README.md
 
+# Config
+CFG | Gitignore | .gitignore
+
 # Shell Script
 SH | Prompt Picker | prompt_picker/prompt_picker.sh
 SH | Prompt Helper | prompt_helper/prompt_helper.sh

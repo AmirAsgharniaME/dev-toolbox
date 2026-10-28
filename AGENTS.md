@@ -15,7 +15,7 @@ bash prompt_picker.sh
 
 For direct execution, use `chmod +x prompt_picker.sh` once, then `./prompt_picker.sh`. It needs Bash 4+, Rofi, and (for full window and clipboard behavior) `xdotool`, `xprop`, and either `xclip` or `xsel`. `notify-send` is optional. To check Bash syntax after editing, run `bash -n prompt_picker/prompt_picker.sh`.
 
-Run the prompt helper with `bash prompt_helper/prompt_helper.sh`. It needs Zenity, Python 3 with the `requests` package, `xclip`, and `xdotool`. Set `GAPGPT_API_KEY` in the environment of the process that launches the helper. Check its Bash syntax with `bash -n prompt_helper/prompt_helper.sh`.
+Run the prompt helper with `bash prompt_helper/prompt_helper.sh`. It needs Zenity, Python 3 with the `requests` package, `xclip`, and `xdotool`. The refiner reads `GAPGPT_API_KEY` first; if it is unset or empty, it reads the key from `prompt_helper/.gapgpt_key`. Keep that local key file private and out of version control. Check its Bash syntax with `bash -n prompt_helper/prompt_helper.sh`.
 
 ## Coding Style & Naming Conventions
 

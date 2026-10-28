@@ -4,7 +4,7 @@
 # Dynamic action selection (Syntax, Logic, Refactor, Rewrite, Sync, None)
 # Standalone use: chmod +x prompt_picker.sh && ./prompt_picker.sh
 
-TARGET_FILE="file_path.md"
+TARGET_FILE="FILEPATH.md"
 LEGACY_TARGET_FILES=("file_path" "file_path.txt")
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -128,7 +128,7 @@ PROMPT
 
 make_list_prompt() {
     cat <<'PROMPT'
-Inspect workspace and update `file_path.md` at project root using its embedded schema.
+Inspect workspace and update `FILEPATH.md` at project root using its embedded schema.
 Derive labels strictly by converting the filename's snake_case to Title Case (do not append words like 'placeholder').
 Ensure exact file paths on disk without duplicating extensions. Do not touch source files.
 
@@ -564,10 +564,10 @@ show_move_prompt() {
 if [[ -z "$FILE_PATH" ]]; then
     if command -v zenity >/dev/null 2>&1; then
         zenity --info --title="No file list found" \
-            --text="Could not find file_path.md (or a legacy file_path/file_path.txt) beside the script, in the current directory, or in the active project's process tree. Project and Git prompts remain available." \
+            --text="Could not find FILEPATH.md (or a legacy file_path/file_path.txt) beside the script, in the current directory, or in the active project's process tree. Project and Git prompts remain available." \
             2>/dev/null || true
     elif command -v rofi >/dev/null 2>&1; then
-        rofi -e "No file_path.md (or legacy file_path/file_path.txt) found. Project and Git prompts remain available." 2>/dev/null || true
+        rofi -e "No FILEPATH.md (or legacy file_path/file_path.txt) found. Project and Git prompts remain available." 2>/dev/null || true
     elif command -v notify-send >/dev/null 2>&1; then
         notify-send "No file list found" "Project and Git prompts remain available." -i dialog-information
     fi

@@ -26,7 +26,7 @@ You can also run it with `bash prompt_picker.sh`. For convenient access, bind th
 
 ## Project file list
 
-The picker reads `file_path.md` first. For backward compatibility, it also accepts the legacy names `file_path` and `file_path.txt` when the Markdown inventory is absent. It looks in these locations, in order:
+The picker reads `FILEPATH.md` first. For backward compatibility, it also accepts the legacy names `file_path.md`, `file_path`, and `file_path.txt` when the renamed inventory is absent. It looks in these locations, in order:
 
 1. The directory containing `prompt_picker.sh`
 2. The current working directory
@@ -47,7 +47,7 @@ SH | Prompt Picker | prompt_picker/prompt_picker.sh
 
 Blank lines and lines beginning with `#`, `-`, or `=` are ignored. Entries with three non-empty fields become selectable files. A line with just one field is treated as a raw menu entry. Paths are used in the generated prompt as written; keep them accurate relative to the project.
 
-Choose **Create/update project file list** from the main menu to copy a prompt for updating the project's root `file_path.md` inventory. If no file list is found, the script still offers Git prompts and main project prompts, including the file list update prompt.
+Choose **Create/update project file list** from the main menu to copy a prompt for updating the project's root `FILEPATH.md` inventory. If no file list is found, the script still offers Git prompts and main project prompts, including the file list update prompt.
 
 ## Using the picker
 

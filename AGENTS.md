@@ -21,6 +21,10 @@ Run the prompt helper with `bash prompt_helper/prompt_helper.sh`. It needs Zenit
 
 Keep shell code compatible with Bash 4+, use four spaces for indentation, quote expansions, and prefer small functions with descriptive `snake_case` names. Preserve the script’s existing checks for optional desktop utilities so it can degrade gracefully when they are missing.
 
+## Keeping README Files Current
+
+For every project change, review the root `README.md` and the README for each utility touched by the change. Keep documentation accurate in the same change as the code or project structure it describes: update affected overviews, behavior, setup, dependencies, configuration, run instructions, and workflows, and remove or revise instructions that are no longer accurate. When a README changes, check related links and examples against the current files and commands.
+
 ## Keeping `FILEPATH.md` Synchronized
 
 Check and update the root `FILEPATH.md` in the same change whenever a project file is added, deleted, renamed, moved, or changes file type. Add one entry for each new or changed project file using `TYPE | LABEL | PATH`; remove stale entries for deleted or old paths, and replace them with the current entry. Keep paths exact and relative to the repository root. Choose the type from the inventory’s `# TYPES` list (for example, `MD` for Markdown and `SH` for shell scripts); when an extension or role changes, update the type too. If a file needs a type not yet listed, add an appropriate type to `# TYPES` and document the convention here. Use the inventory’s mechanical filename-to-title label rule, retain its section headers, and place entries under the matching section. Before finishing, compare the inventory against the project files so no changed path remains stale. Include `AGENTS.md` in the inventory.

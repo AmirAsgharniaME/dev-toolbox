@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This repository contains a standalone Bash/Rofi toolkit. The main utility is `prompt_picker/prompt_picker.sh`, with setup and usage notes in `prompt_picker/README.md`. The root `README.md` gives the project overview; `LICENSE` contains licensing terms. The root `FILEPATH.md` is the picker’s pipe-separated project inventory (`TYPE | LABEL | PATH`), used to populate file menus and prompts. Keep it synchronized with project files as described below. There is no separate source, asset, or test tree at present.
+This repository contains standalone Bash desktop utilities. `prompt_picker/prompt_picker.sh` is the Rofi picker, with setup and usage notes in `prompt_picker/README.md`. `prompt_helper/prompt_helper.sh` opens a Zenity prompt and uses `prompt_helper/refine_prompt.py` to refine it through the GapGPT API. The root `README.md` gives the project overview; `LICENSE` contains licensing terms. The root `FILEPATH.md` is the pipe-separated project inventory (`TYPE | LABEL | PATH`), used to populate file menus and prompts. Keep it synchronized with project files as described below. There is no separate source, asset, or test tree at present.
 
 ## Build, Test, and Development Commands
 
@@ -14,6 +14,8 @@ bash prompt_picker.sh
 ```
 
 For direct execution, use `chmod +x prompt_picker.sh` once, then `./prompt_picker.sh`. It needs Bash 4+, Rofi, and (for full window and clipboard behavior) `xdotool`, `xprop`, and either `xclip` or `xsel`. `notify-send` is optional. To check Bash syntax after editing, run `bash -n prompt_picker/prompt_picker.sh`.
+
+Run the prompt helper with `bash prompt_helper/prompt_helper.sh`. It needs Zenity, Python 3 with the `requests` package, `xclip`, and `xdotool`. Set `GAPGPT_API_KEY` in the environment of the process that launches the helper. Check its Bash syntax with `bash -n prompt_helper/prompt_helper.sh`.
 
 ## Coding Style & Naming Conventions
 

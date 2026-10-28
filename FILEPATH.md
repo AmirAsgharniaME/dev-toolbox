@@ -9,6 +9,11 @@ MD | Readme | README.md
 MD | Agents | AGENTS.md
 MD | Filepath | FILEPATH.md
 MD | Readme | prompt_picker/README.md
+MD | Readme | prompt_helper/README.md
 
 # Shell Script
 SH | Prompt Picker | prompt_picker/prompt_picker.sh
+SH | Prompt Helper | prompt_helper/prompt_helper.sh
+
+# Python Script
+PY | Refine Prompt | prompt_helper/refine_prompt.py

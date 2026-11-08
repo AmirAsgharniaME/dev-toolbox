@@ -60,7 +60,9 @@ Select a file from the Rofi menu. Then choose an action, or choose **Add File Pa
 - Sync selected files with one or more dependency files
 - Run one of the staged C++ performance prompt pipelines for a project, class, or function
 - Open the Git prompts menu
-- Open the main project prompts menu, including the AGENTS.md and file list prompts
+- Open the main project prompts menu, including the AGENTS.md, file list, and Agent-Step prompts
+
+The **Agent-Step** prompt directs an AI assistant to execute only the first unchecked step in `TASK_PLAN.md`, verify the build, record the required execution log, and stop for review.
 
 The Git menu can create commit, push, branch, and file operation prompts. It generates prompt text; it does not execute Git commands itself. File remove, rename, and move actions collect paths and generate a prompt for an AI assistant.
 

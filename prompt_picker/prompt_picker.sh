@@ -98,6 +98,7 @@ fi
 
 LIST_ACTION="2. Create/update project file list"
 AGENTS_ACTION="1. Update AGENTS.md File"
+AGENT_STEP_ACTION="3. Agent-Step"
 DELETE_BRANCH_ACTION="Delete Current Branch"
 GIT_PROMPTS_ACTION="1. Git Prompts"
 MAIN_PROJECT_PROMPTS_ACTION="2. Main Project Prompts"
@@ -132,6 +133,26 @@ Inspect workspace and update `FILEPATH.md` at project root using its embedded sc
 Derive labels strictly by converting the filename's snake_case to Title Case (do not append words like 'placeholder').
 Ensure exact file paths on disk without duplicating extensions. Do not touch source files.
 
+PROMPT
+}
+
+make_agent_step_prompt() {
+    cat <<'PROMPT'
+Read `STATE.md` and check `TASK_PLAN.md`.
+
+STRICT CONSTRAINTS:
+1. Locate the FIRST unchecked item `[ ]` in `TASK_PLAN.md`.
+2. Execute ONLY this single step. Do NOT touch or look ahead to subsequent steps.
+3. Keep modifications minimal, strictly adhering to our C++20 CFD Toolkit architecture.
+4. Verify changes by ensuring the project compiles cleanly with zero warnings/errors.
+5. Post-Execution Documentation (Mandatory):
+   - Mark ONLY this executed step as `[x]` in `TASK_PLAN.md`.
+   - Append a concise entry under `## Execution Log` in `TASK_PLAN.md` formatted as:
+     `### [Step ID/Name] - Completed`
+     `- Changes made: (1-2 sentences with affected files)`
+     `- Verification: (compiler status / test result)`
+   - Update `STATE.md` ONLY IF an API signature, class definition, or geometry/matrix concept was modified.
+6. Stop immediately, output the git diff/code changes, and await my review before continuing.
 PROMPT
 }
 
@@ -340,13 +361,14 @@ show_main_project_prompts_menu() {
     local chosen_action
 
     chosen_action=$(
-        printf '%s\n' "$AGENTS_ACTION" "$LIST_ACTION" |
+        printf '%s\n' "$AGENTS_ACTION" "$LIST_ACTION" "$AGENT_STEP_ACTION" |
             rofi -dmenu -i -no-custom -p "Main Project Prompts:" -matching fuzzy
     )
 
     case "$chosen_action" in
         "$LIST_ACTION") copy_and_paste_prompt "$(make_list_prompt)" ;;
         "$AGENTS_ACTION") copy_and_paste_prompt "$(make_agents_prompt)" ;;
+        "$AGENT_STEP_ACTION") copy_and_paste_prompt "$(make_agent_step_prompt)" ;;
     esac
 }
 

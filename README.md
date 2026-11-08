@@ -6,7 +6,7 @@ Small desktop utilities for building coding prompts and working with project fil
 
 ### Prompt Picker
 
-[`prompt_picker/prompt_picker.sh`](prompt_picker/prompt_picker.sh) reads a project's `FILEPATH.md` inventory and offers file-specific coding prompts, project prompts, and Git workflow prompts. It prints generated prompts and copies them to the clipboard; when the desktop tools are available, it can also return to the previously focused window and paste the prompt.
+[`prompt_picker/prompt_picker.sh`](prompt_picker/prompt_picker.sh) reads a project's `FILEPATH.md` inventory and offers file-specific coding prompts, project prompts, and Git workflow prompts. Its Main Project Prompts menu includes an Agent-Step workflow for executing and documenting only the first unchecked task-plan step. It prints generated prompts and copies them to the clipboard; when the desktop tools are available, it can also return to the previously focused window and paste the prompt.
 
 See [`prompt_picker/README.md`](prompt_picker/README.md) for setup, requirements, and usage details.
 

@@ -99,6 +99,7 @@ fi
 LIST_ACTION="2. Create/update project file list"
 AGENTS_ACTION="1. Update AGENTS.md File"
 AGENT_STEP_ACTION="3. Agent-Step"
+PLAN_ACTION="4. Plan"
 DELETE_BRANCH_ACTION="Delete Current Branch"
 GIT_PROMPTS_ACTION="1. Git Prompts"
 MAIN_PROJECT_PROMPTS_ACTION="2. Main Project Prompts"
@@ -154,6 +155,55 @@ STRICT CONSTRAINTS:
    - Update `STATE.md` ONLY IF an API signature, class definition, or geometry/matrix concept was modified.
 6. Stop immediately, output the git diff/code changes, and await my review before continuing.
 PROMPT
+}
+
+make_plan_prompt() {
+    local goal="$1"
+    local prompt
+
+    prompt=$(cat <<'PROMPT'
+Role: Lead C++ CFD Architect
+Context: Read current STATE.md and inspect relevant project files.
+
+Goal: "__PLAN_GOAL__"
+
+STRICT CONSTRAINTS:
+1. Do NOT write or modify any C++ source code (.cpp / .hpp) yet.
+
+2. Technical Audit (`AGENT_REPORT.md`):
+   - Compare architectural options (Option A, Option B, etc.) with Pros & Cons.
+   - Select and justify a single `Recommended Approach` aligned with our C++20 CFD Toolkit standards.
+
+3. Actionable Breakdown (`TASK_PLAN.md`):
+   - Generate the step-by-step checklist ONLY for the `Recommended Approach` (do not mix multiple plans here).
+   - Structure it with:
+     * Target & Goal
+     * Atomic, numbered steps in Phases (Step 1.1, Step 1.2, etc.)
+     * An empty `## Execution Log` section at the end.
+
+4. Stop and await my approval. If I prefer an alternative option, I will ask you to rewrite TASK_PLAN.md.
+PROMPT
+    )
+
+    printf '%s' "${prompt//__PLAN_GOAL__/$goal}"
+}
+
+show_plan_prompt() {
+    local goal
+
+    if command -v zenity >/dev/null 2>&1; then
+        goal=$(printf '' | zenity --text-info --editable \
+            --title="Please describe your issue" \
+            --text="Please describe your issue below:" \
+            --width=900 --height=500 2>/dev/null) || exit 0
+    else
+        goal=$(rofi -dmenu -i -p "Please describe your issue:" -matching fuzzy </dev/null) || exit 0
+    fi
+
+    goal=$(trim_input "$goal")
+    [[ -n "$goal" ]] || exit 0
+
+    copy_and_paste_prompt "$(make_plan_prompt "$goal")"
 }
 
 make_commit_changes_prompt() {
@@ -361,7 +411,7 @@ show_main_project_prompts_menu() {
     local chosen_action
 
     chosen_action=$(
-        printf '%s\n' "$AGENTS_ACTION" "$LIST_ACTION" "$AGENT_STEP_ACTION" |
+        printf '%s\n' "$AGENTS_ACTION" "$LIST_ACTION" "$AGENT_STEP_ACTION" "$PLAN_ACTION" |
             rofi -dmenu -i -no-custom -p "Main Project Prompts:" -matching fuzzy
     )
 
@@ -369,6 +419,7 @@ show_main_project_prompts_menu() {
         "$LIST_ACTION") copy_and_paste_prompt "$(make_list_prompt)" ;;
         "$AGENTS_ACTION") copy_and_paste_prompt "$(make_agents_prompt)" ;;
         "$AGENT_STEP_ACTION") copy_and_paste_prompt "$(make_agent_step_prompt)" ;;
+        "$PLAN_ACTION") show_plan_prompt ;;
     esac
 }
 

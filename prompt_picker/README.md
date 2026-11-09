@@ -60,11 +60,12 @@ Select a file from the Rofi menu. Then choose an action, or choose **Add File Pa
 - Sync selected files with one or more dependency files
 - Run one of the staged C++ performance prompt pipelines for a project, class, or function
 - Open the Git prompts menu
-- Open the main project prompts menu, including the AGENTS.md, file list, AGENT_REPORT.md, TASK_PLAN.md, and last-priority Exec-Task prompts
+- Open the main project prompts menu, including the AGENTS.md, file list, AGENT_REPORT.md, and TASK_PLAN.md prompts, followed by Exec-Task and the last-priority Update STATE.md prompt
 
 The **Create AGENT_REPORT.md** option generates a prompt for a fresh architectural report using a fixed five-section structure, without modifying C++ source files.
 The **Create TASK_PLAN.md** option generates a prompt to overwrite `TASK_PLAN.md` with a self-contained, atomic execution checklist derived from `AGENT_REPORT.md`, without modifying C++ source files.
-The last-priority **Exec-Task** option generates a prompt to execute only the first unchecked step in `TASK_PLAN.md`, verify it using that step's command, and update the checklist and execution log.
+The **Exec-Task** option generates a prompt to execute only the first unchecked step in `TASK_PLAN.md`, verify it using that step's command, and update the checklist and execution log.
+The final **Update STATE.md** option generates a prompt to update `STATE.md` from completed task-plan evidence, the execution log, and verified code changes.
 
 The Git menu can create commit, push, branch, and file operation prompts. It generates prompt text; it does not execute Git commands itself. File remove, rename, and move actions collect paths and generate a prompt for an AI assistant.
 

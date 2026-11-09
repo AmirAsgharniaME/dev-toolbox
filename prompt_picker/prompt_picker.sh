@@ -101,6 +101,7 @@ AGENTS_ACTION="1. Update AGENTS.md File"
 AGENT_REPORT_ACTION="3. Create AGENT_REPORT.md"
 TASK_PLAN_ACTION="4. Create TASK_PLAN.md"
 EXEC_TASK_ACTION="5. Exec-Task"
+STATE_ACTION="6. Update STATE.md"
 DELETE_BRANCH_ACTION="Delete Current Branch"
 GIT_PROMPTS_ACTION="1. Git Prompts"
 MAIN_PROJECT_PROMPTS_ACTION="2. Main Project Prompts"
@@ -227,6 +228,32 @@ STRICT OPERATIONAL CONSTRAINTS:
 5. STOP IMMEDIATELY:
    - Do NOT proceed to the next step under any circumstances.
    - Output a brief summary in the chat informing Amir that this specific step is done and ready for review.
+PROMPT
+}
+
+make_state_update_prompt() {
+    cat <<'PROMPT'
+Role: Senior C++ CFD Software Architect
+Task: Systematically synchronize and update `STATE.md` to reflect the completed milestone.
+
+Objective:
+`STATE.md` is the single source of truth for the project's architectural, mathematical, and implementation state. Your goal is to inspect the completed work, deduce the exact architectural shifts and newly verified capabilities, and update `STATE.md` in-place.
+
+Workflow & Context to Inspect:
+1. Ground Truth Baseline: Read the current `STATE.md`.
+2. Completed Execution Evidence: Read `TASK_PLAN.md` (especially all completed checkmarks and the appended `## Execution Log`).
+3. Code Inspection: Use `git diff` or inspect the modified/created source and header files referenced in the execution log to verify actual method signatures and implementation reality.
+
+Update Guidelines:
+- Preserve Structure: Retain the established sections, tone, and formatting of `STATE.md`. Do not wipe out historic architectural foundations.
+- Architectural Precision: Document newly introduced classes, APIs, mathematical formulations, or design patterns exactly as implemented (no guessing or pseudo-code).
+- Verification & Benchmarks: Record concrete verification evidence (compilation passes, numerical parity checks, stdout byte comparisons) reported in the execution log.
+- Clean Evolution: Update the current project status, remove obsolete technical debt notes that were resolved, and set the stage for upcoming architectural priorities based on the project roadmap.
+
+Constraints:
+- Strictly English output for markdown documentation.
+- Rely ONLY on verified facts from the codebase and execution logs.
+- Apply changes directly to `STATE.md`.
 PROMPT
 }
 
@@ -435,7 +462,7 @@ show_main_project_prompts_menu() {
     local chosen_action
 
     chosen_action=$(
-        printf '%s\n' "$AGENTS_ACTION" "$LIST_ACTION" "$AGENT_REPORT_ACTION" "$TASK_PLAN_ACTION" "$EXEC_TASK_ACTION" |
+        printf '%s\n' "$AGENTS_ACTION" "$LIST_ACTION" "$AGENT_REPORT_ACTION" "$TASK_PLAN_ACTION" "$EXEC_TASK_ACTION" "$STATE_ACTION" |
             rofi -dmenu -i -no-custom -p "Main Project Prompts:" -matching fuzzy
     )
 
@@ -445,6 +472,7 @@ show_main_project_prompts_menu() {
         "$AGENT_REPORT_ACTION") copy_and_paste_prompt "$(make_agent_report_prompt)" ;;
         "$TASK_PLAN_ACTION") copy_and_paste_prompt "$(make_task_plan_prompt)" ;;
         "$EXEC_TASK_ACTION") copy_and_paste_prompt "$(make_exec_task_prompt)" ;;
+        "$STATE_ACTION") copy_and_paste_prompt "$(make_state_update_prompt)" ;;
     esac
 }
 

@@ -2,11 +2,11 @@
 
 ## Project Structure & Module Organization
 
-This repository contains standalone Linux desktop utilities. `prompt_picker/prompt_picker.sh` is the Rofi picker, with setup and usage notes in `prompt_picker/README.md`. Its Main Project Prompts menu generates prompts for updating `AGENTS.md`, `FILEPATH.md`, and `STATE.md`, creating `AGENT_REPORT.md` and `TASK_PLAN.md`, and executing the first unchecked task-plan step. `prompt_helper/prompt_helper.sh` opens a Zenity prompt and uses `prompt_helper/refine_prompt.py` to refine it through the GapGPT API. `translator/run_translator.sh` launches `translator/translator.py`, which polishes selected or piped text through the GapGPT API. The root `README.md` gives the project overview; `LICENSE` contains licensing terms. The root `FILEPATH.md` is the pipe-separated project inventory (`TYPE | LABEL | PATH`), used to populate file menus and prompts. Keep it synchronized with project files as described below. There is no separate asset or test tree at present.
+This repository contains standalone Linux desktop utilities. `prompt_picker/prompt_picker.sh` is the Rofi picker, with setup and usage notes in `prompt_picker/README.md`. Its Main Project Prompts menu generates prompts for updating `AGENTS.md`, `FILEPATH.md`, and `STATE.md`; creating `STATE.md`, `AGENT_REPORT.md`, and `TASK_PLAN.md`; and executing the first unchecked task-plan step. The picker also contains C++/CFD-oriented prompt templates, but this repository does not contain the CFD library those prompts may target: there is no `CMakeLists.txt`, `include/`, `src/`, `examples/`, or C++ source tree here. `prompt_helper/prompt_helper.sh` opens a Zenity prompt and uses `prompt_helper/refine_prompt.py` to refine it through the GapGPT API. `translator/run_translator.sh` launches `translator/translator.py`, which polishes selected or piped text through the GapGPT API. The root `README.md` gives the project overview; `LICENSE` contains licensing terms. The root `FILEPATH.md` is the pipe-separated project inventory (`TYPE | LABEL | PATH`), used to populate file menus and prompts. Keep it synchronized with project files as described below. There is no separate asset or test tree at present.
 
 ## Build, Test, and Development Commands
 
-There is no build system or automated test suite currently configured. Run the utility from its directory with:
+There is no build system or automated test suite configured in this repository; the C++/CFD build and architecture instructions in picker prompts apply to the project being prompted, not to `dev-toolbox`. Run the utility from its directory with:
 
 ```bash
 cd prompt_picker

@@ -60,8 +60,9 @@ Select a file from the Rofi menu. Then choose an action, or choose **Add File Pa
 - Sync selected files with one or more dependency files
 - Run one of the staged C++ performance prompt pipelines for a project, class, or function
 - Open the Git prompts menu
-- Open the main project prompts menu, including the AGENTS.md, file list, AGENT_REPORT.md, and TASK_PLAN.md prompts, followed by Exec-Task and the last-priority Update STATE.md prompt
+- Open the main project prompts menu, including the AGENTS.md and file list prompts, the priority-3 Create STATE.md prompt, AGENT_REPORT.md and TASK_PLAN.md prompts, Exec-Task, and the last-priority Update STATE.md prompt
 
+The priority-3 **Create STATE.md** option generates a prompt to inspect the codebase and create a fact-driven architectural and FVM state ledger in the project root.
 The **Create AGENT_REPORT.md** option generates a prompt for a fresh architectural report using a fixed five-section structure, without modifying C++ source files.
 The **Create TASK_PLAN.md** option generates a prompt to overwrite `TASK_PLAN.md` with a self-contained, atomic execution checklist derived from `AGENT_REPORT.md`, without modifying C++ source files.
 The **Exec-Task** option generates a prompt to execute only the first unchecked step in `TASK_PLAN.md`, verify it using that step's command, and update the checklist and execution log.

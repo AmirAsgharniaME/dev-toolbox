@@ -98,10 +98,11 @@ fi
 
 LIST_ACTION="2. Create/update project file list"
 AGENTS_ACTION="1. Update AGENTS.md File"
-AGENT_REPORT_ACTION="3. Create AGENT_REPORT.md"
-TASK_PLAN_ACTION="4. Create TASK_PLAN.md"
-EXEC_TASK_ACTION="5. Exec-Task"
-STATE_ACTION="6. Update STATE.md"
+CREATE_STATE_ACTION="3. Create STATE.md"
+AGENT_REPORT_ACTION="4. Create AGENT_REPORT.md"
+TASK_PLAN_ACTION="5. Create TASK_PLAN.md"
+EXEC_TASK_ACTION="6. Exec-Task"
+STATE_ACTION="7. Update STATE.md"
 DELETE_BRANCH_ACTION="Delete Current Branch"
 GIT_PROMPTS_ACTION="1. Git Prompts"
 MAIN_PROJECT_PROMPTS_ACTION="2. Main Project Prompts"
@@ -199,6 +200,62 @@ OUTPUT STRUCTURE FOR `TASK_PLAN.md`:
 PROMPT
 }
 
+make_create_state_prompt() {
+    cat <<'PROMPT'
+Role: Principal C++ CFD Software Architect
+Task: Reverse-engineer the current codebase and establish the foundational `STATE.md` (Ground Truth Ledger).
+
+Context & Premise:
+This is a Computational Fluid Dynamics (CFD) project implemented in Modern C++ using the Finite Volume Method (FVM). Some core modules, data structures, or drivers have already been implemented, but the project now requires a single, authoritative architectural ledger (`STATE.md`) to guide future development.
+
+Inspection Strategy (Do this thoroughly before writing):
+1. Build System & Toolchain: Inspect CMakeLists.txt, Makefiles, or build scripts to determine C++ standard (C++17/20), dependencies, compiler flags, and target layout (libraries vs. executables/examples).
+2. Codebase Topology: Map the physical directory structure under `include/`, `src/`, `apps/`, `tests/`, etc.
+3. Geometric & Mesh Layer: Inspect mesh representations, cell/face topologies, connectivity, boundary patch representations, and dimensionality (1D, 2D, 3D, structured, or unstructured).
+4. Discrete Fields & Stencils: Identify scalar/vector field abstractions, geometric associations (cell-centered vs. face-centered), and interpolation/gradient schemes.
+5. FVM Discretization & Operators: Identify implemented physical operators (e.g., diffusion/Laplacian, convection/divergence, transient terms, source terms), face flux evaluations, sign conventions, and boundary condition handling.
+6. Linear Algebra & Assembly Seam: Inspect linear system abstractions (matrix formats, sparse/tridiagonal storage, solvers, preconditioners) and how operator fluxes are assembled into the matrix.
+7. Verification & Drivers: Review existing application drivers, benchmarks, unit tests, or contract validation checks to understand verified capabilities.
+
+Output Specification:
+Create `STATE.md` directly in the project root with the following structured sections:
+
+# Project State & Architecture Ledger (STATE.md)
+
+## 1. Executive Summary & Design Philosophy
+- High-level scope, design paradigm (e.g., OpenFOAM-style modularity, client-first design, direction-agnostic face formulation), and current maturity stage.
+
+## 2. Technical Stack & Toolchain
+- Language standard, supported compilers, build system architecture, external dependencies (if any, or pure zero-dependency standard C++).
+
+## 3. Architecture & Directory Topology
+- Concrete breakdown of directories and layer decoupling (e.g., core math/geometry vs. numerical operators vs. applications).
+
+## 4. Mathematical & FVM Discretization State
+- Formal governing equation forms currently supported.
+- Sign and flux conventions (outward normal vectors, intrinsic face orientations, LHS/RHS partitioning).
+- Implemented operator formulations (diffusion, convection, source, time schemes).
+- Boundary condition abstraction and mathematical mapping (Dirichlet, Neumann, mixed).
+
+## 5. Data Structures & Assembly Seam
+- Detailed inventory of core classes (Mesh, Fields, Matrix, Solvers) with their exact modern C++ API signatures and memory layout.
+- Interface contract between spatial FVM operators and linear algebraic matrix assembly.
+
+## 6. Verification Status & Verified Baselines
+- Inventory of existing application drivers, tests, and benchmark problems with their verification state and known reference metrics.
+
+## 7. Known Technical Debt & Immediate Roadmap
+- Clear separation between what is solidly implemented vs. what is placeholder/hardcoded or missing.
+- Architectural candidates for the next development milestones.
+
+Constraints:
+- Strictly English output.
+- Fact-driven only: Deduce every statement from the actual code. Do NOT speculate, hallucinate methods that do not exist, or assume unverified physical features.
+- Write modern, rigorous CFD engineering documentation with clear mathematical precision (using LaTeX notation where applicable).
+- Write the result directly to `STATE.md`.
+PROMPT
+}
+
 make_exec_task_prompt() {
     cat <<'PROMPT'
 Role: Senior Modern C++ (C++20) Systems & CFD Engineer
@@ -271,6 +328,27 @@ Please inspect the current git status and git diff of my C++ CFD project. Based 
 PROMPT
 }
 
+make_commit_prompt() {
+    cat <<'PROMPT'
+Please inspect the current `git status` and `git diff` of this repository. Based on the latest uncommitted modifications, perform the following steps precisely:
+
+1. Analyze Changes: Examine the modified/untracked files to understand the core technical or structural intent across the project.
+2. Determine Conventional Type & Scope:
+   - Select an appropriate conventional type: `feat`, `fix`, `refactor`, `docs`, `test`, `perf`, `build`, or `chore`.
+   - Infer a clear, relevant scope based on the affected module, directory, or feature (e.g., `core`, `cli`, `notes`, `api`, `config`, or omit scope if changes are repo-wide).
+3. Draft Standard Commit Message:
+   - Summary: Provide an imperative, lowercase/standardized headline under 50 characters (e.g., `feat(module): add boundary condition parser`).
+   - Description: Provide a structured, bullet-pointed body explaining:
+     * WHAT was changed (the functional/architectural shift).
+     * WHY it was changed (context, rationale, problem solved), avoiding trivial syntax-level noise.
+4. Stage & Commit Locally:
+   - Stage the relevant modified/added files (`git add`).
+   - Execute the local commit using the drafted summary and multi-line body.
+
+*Strict Constraint:* Do NOT run `git push` under any circumstances. Keep the operation strictly local and print the exact commit summary and full body in your response for my review.
+PROMPT
+}
+
 make_push_commits_prompt() {
     cat <<'PROMPT'
 Please check the current git status and inspect any local commits that have not yet been pushed to the remote repository (origin). Follow these steps carefully:
@@ -337,20 +415,21 @@ show_git_prompts_menu() {
     local chosen_action
 
     chosen_action=$(
-        printf '%s\n' "1. Commit Changes" "2. Push Commits" "3. Remove" "4. Rename" "5. Move" "6. Create New Branch" "7. Switch Branch" "8. $DELETE_BRANCH_ACTION" "9. Delete Branch" |
+        printf '%s\n' "1. Commit Changes (CFD)" "2. Commit Changes" "3. Push Commits" "4. Remove" "5. Rename" "6. Move" "7. Create New Branch" "8. Switch Branch" "9. $DELETE_BRANCH_ACTION" "10. Delete Branch" |
             rofi -dmenu -i -no-custom -p "Git Prompts:" -matching fuzzy
     )
 
     case "$chosen_action" in
-        "1. Commit Changes") copy_and_paste_prompt "$(make_commit_changes_prompt)" ;;
-        "2. Push Commits") copy_and_paste_prompt "$(make_push_commits_prompt)" ;;
-        "3. Remove") show_remove_prompt ;;
-        "4. Rename") show_rename_prompt ;;
-        "5. Move") show_move_prompt ;;
-        "6. Create New Branch") show_create_branch_prompt ;;
-        "7. Switch Branch") show_switch_branch_prompt ;;
-        "8. $DELETE_BRANCH_ACTION") show_delete_branch_message ;;
-        "9. Delete Branch") show_delete_named_branch_prompt ;;
+        "1. Commit Changes (CFD)") copy_and_paste_prompt "$(make_commit_changes_prompt)" ;;
+        "2. Commit Changes") copy_and_paste_prompt "$(make_commit_prompt)" ;;
+        "3. Push Commits") copy_and_paste_prompt "$(make_push_commits_prompt)" ;;
+        "4. Remove") show_remove_prompt ;;
+        "5. Rename") show_rename_prompt ;;
+        "6. Move") show_move_prompt ;;
+        "7. Create New Branch") show_create_branch_prompt ;;
+        "8. Switch Branch") show_switch_branch_prompt ;;
+        "9. $DELETE_BRANCH_ACTION") show_delete_branch_message ;;
+        "10. Delete Branch") show_delete_named_branch_prompt ;;
     esac
 }
 
@@ -462,13 +541,14 @@ show_main_project_prompts_menu() {
     local chosen_action
 
     chosen_action=$(
-        printf '%s\n' "$AGENTS_ACTION" "$LIST_ACTION" "$AGENT_REPORT_ACTION" "$TASK_PLAN_ACTION" "$EXEC_TASK_ACTION" "$STATE_ACTION" |
+        printf '%s\n' "$AGENTS_ACTION" "$LIST_ACTION" "$CREATE_STATE_ACTION" "$AGENT_REPORT_ACTION" "$TASK_PLAN_ACTION" "$EXEC_TASK_ACTION" "$STATE_ACTION" |
             rofi -dmenu -i -no-custom -p "Main Project Prompts:" -matching fuzzy
     )
 
     case "$chosen_action" in
         "$LIST_ACTION") copy_and_paste_prompt "$(make_list_prompt)" ;;
         "$AGENTS_ACTION") copy_and_paste_prompt "$(make_agents_prompt)" ;;
+        "$CREATE_STATE_ACTION") copy_and_paste_prompt "$(make_create_state_prompt)" ;;
         "$AGENT_REPORT_ACTION") copy_and_paste_prompt "$(make_agent_report_prompt)" ;;
         "$TASK_PLAN_ACTION") copy_and_paste_prompt "$(make_task_plan_prompt)" ;;
         "$EXEC_TASK_ACTION") copy_and_paste_prompt "$(make_exec_task_prompt)" ;;

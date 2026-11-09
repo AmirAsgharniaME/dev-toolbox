@@ -6,7 +6,7 @@ Small desktop utilities for building coding prompts and working with project fil
 
 ### Prompt Picker
 
-[`prompt_picker/prompt_picker.sh`](prompt_picker/prompt_picker.sh) reads a project's `FILEPATH.md` inventory and offers file-specific coding prompts, project prompts, and Git workflow prompts. Its Main Project Prompts menu includes an Agent-Step workflow for executing and documenting only the first unchecked task-plan step. It prints generated prompts and copies them to the clipboard; when the desktop tools are available, it can also return to the previously focused window and paste the prompt.
+[`prompt_picker/prompt_picker.sh`](prompt_picker/prompt_picker.sh) reads a project's `FILEPATH.md` inventory and offers file-specific coding prompts, project prompts, and Git workflow prompts. Its Main Project Prompts menu includes prompts for creating `AGENT_REPORT.md` and `TASK_PLAN.md`, plus a last-priority **Exec-Task** prompt for carrying out the first unchecked task-plan step. It prints generated prompts and copies them to the clipboard; when the desktop tools are available, it can also return to the previously focused window and paste the prompt.
 
 See [`prompt_picker/README.md`](prompt_picker/README.md) for setup, requirements, and usage details.
 
@@ -31,7 +31,7 @@ The translator needs Python 3, `requests`, `xclip`, `xdotool`, and `notify-send`
 - A GapGPT API key to refine prompts with Prompt Helper
 - Python 3, `requests`, `xclip`, `xdotool`, `notify-send`, and a GapGPT API key for Translator
 
-The Prompt Picker also supports `xsel` as a clipboard alternative. `xprop` and `notify-send` are optional; details and graceful fallback behavior are documented in its README. Its Main Project Prompts menu includes a Plan workflow with a large editable text area for collecting an issue or goal before generating an architecture audit and single recommended task plan prompt.
+The Prompt Picker also supports `xsel` as a clipboard alternative. `xprop` and `notify-send` are optional; details and graceful fallback behavior are documented in its README. Its Main Project Prompts menu includes prompts to create a fresh `AGENT_REPORT.md` and a `TASK_PLAN.md` execution checklist, followed by the last-priority **Exec-Task** option.
 
 ## Run
 

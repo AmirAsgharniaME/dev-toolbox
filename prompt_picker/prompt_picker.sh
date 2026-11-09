@@ -98,8 +98,9 @@ fi
 
 LIST_ACTION="2. Create/update project file list"
 AGENTS_ACTION="1. Update AGENTS.md File"
-AGENT_STEP_ACTION="3. Agent-Step"
-PLAN_ACTION="4. Plan"
+AGENT_REPORT_ACTION="3. Create AGENT_REPORT.md"
+TASK_PLAN_ACTION="4. Create TASK_PLAN.md"
+EXEC_TASK_ACTION="5. Exec-Task"
 DELETE_BRANCH_ACTION="Delete Current Branch"
 GIT_PROMPTS_ACTION="1. Git Prompts"
 MAIN_PROJECT_PROMPTS_ACTION="2. Main Project Prompts"
@@ -137,73 +138,96 @@ Ensure exact file paths on disk without duplicating extensions. Do not touch sou
 PROMPT
 }
 
-make_agent_step_prompt() {
+make_agent_report_prompt() {
     cat <<'PROMPT'
-Read `STATE.md` and check `TASK_PLAN.md`.
+Role: Senior C++ CFD Software Architect
+Context: Read STATE.md and the relevant codebase headers/sources.
+
+I have a challenge / proposal:
+"[Text of the question, idea or challenge]"
 
 STRICT CONSTRAINTS:
-1. Locate the FIRST unchecked item `[ ]` in `TASK_PLAN.md`.
-2. Execute ONLY this single step. Do NOT touch or look ahead to subsequent steps.
-3. Keep modifications minimal, strictly adhering to our C++20 CFD Toolkit architecture.
-4. Verify changes by ensuring the project compiles cleanly with zero warnings/errors.
-5. Post-Execution Documentation (Mandatory):
-   - Mark ONLY this executed step as `[x]` in `TASK_PLAN.md`.
-   - Append a concise entry under `## Execution Log` in `TASK_PLAN.md` formatted as:
-     `### [Step ID/Name] - Completed`
-     `- Changes made: (1-2 sentences with affected files)`
-     `- Verification: (compiler status / test result)`
-   - Update `STATE.md` ONLY IF an API signature, class definition, or geometry/matrix concept was modified.
-6. Stop immediately, output the git diff/code changes, and await my review before continuing.
+1. Do NOT modify or write any C++ source code files yet.
+2. OVERWRITE `AGENT_REPORT.md`: Completely wipe and replace any existing content in `AGENT_REPORT.md`. Do not read, keep, or append to past reports; write this report completely from scratch.
+3. Follow this EXACT markdown structure in `AGENT_REPORT.md`:
+   - # Architectural Report: [Short Title]
+   - ## 1. Problem Statement / User Query (State my query clearly so future agents understand the exact goal)
+   - ## 2. Codebase Impact Analysis (Exact file paths, affected classes/methods)
+   - ## 3. Proposed Architectural Solution (Concrete C++20 specs, exact method signatures, logic flow, error handling)
+   - ## 4. Risks & Backward Compatibility (Regression prevention)
+   - ## 5. Verification Criteria (Exact build command, driver execution, expected output)
 PROMPT
 }
 
-make_plan_prompt() {
-    local goal="$1"
-    local prompt
+make_task_plan_prompt() {
+    cat <<'PROMPT'
+Role: Senior C++ CFD Technical Lead & Project Planner
+Context: Read `AGENT_REPORT.md` (which contains the problem statement and technical architecture written by a peer architect) and `STATE.md`.
 
-    prompt=$(cat <<'PROMPT'
-Role: Lead C++ CFD Architect
-Context: Read current STATE.md and inspect relevant project files.
-
-Goal: "__PLAN_GOAL__"
+YOUR MISSION:
+Translate the architectural solution in `AGENT_REPORT.md` into an actionable, granular, atomic, and self-contained execution checklist inside `TASK_PLAN.md`.
 
 STRICT CONSTRAINTS:
-1. Do NOT write or modify any C++ source code (.cpp / .hpp) yet.
+1. Do NOT modify or write any C++ source code files.
+2. OVERWRITE `TASK_PLAN.md`: Completely wipe and replace any existing content in `TASK_PLAN.md`.
+3. NEVER place checkboxes (`- [ ]`) on Phase headings; checkboxes are ONLY allowed on concrete, actionable Steps.
+4. SELF-CONTAINED ATOMIC STEPS: An executing agent must be able to complete any Step without reading previous or subsequent steps. Each Step must explicitly list:
+   - Target Files (exact paths)
+   - Detailed Specification (exact method signatures, C++20 standard constraints, arguments, return types, logic flow)
+   - Verification Command (e.g., compilation command or driver run)
+5. Append an empty `## Execution Log` section at the end of the file for the executing agent to record its progress.
 
-2. Technical Audit (`AGENT_REPORT.md`):
-   - Compare architectural options (Option A, Option B, etc.) with Pros & Cons.
-   - Select and justify a single `Recommended Approach` aligned with our C++20 CFD Toolkit standards.
+OUTPUT STRUCTURE FOR `TASK_PLAN.md`:
+# Target: [Title from AGENT_REPORT.md]
 
-3. Actionable Breakdown (`TASK_PLAN.md`):
-   - Generate the step-by-step checklist ONLY for the `Recommended Approach` (do not mix multiple plans here).
-   - Structure it with:
-     * Target & Goal
-     * Atomic, numbered steps in Phases (Step 1.1, Step 1.2, etc.)
-     * An empty `## Execution Log` section at the end.
+## Phase 1: [Phase Name]
+- [ ] **Step 1.1: [Atomic Step Title]**
+  - **Target Files:** `path/to/file.hpp`, `path/to/file.cpp`
+  - **Specification:** [Exact signatures, logic, and error handling as defined in AGENT_REPORT.md]
+  - **Verification:** `make target` or g++ compile command
 
-4. Stop and await my approval. If I prefer an alternative option, I will ask you to rewrite TASK_PLAN.md.
+- [ ] **Step 1.2: [Next Atomic Step Title]**
+  - **Target Files:** ...
+  - **Specification:** ...
+  - **Verification:** ...
+
+## Phase 2: [Phase Name]
+...
+
+## Execution Log
 PROMPT
-    )
-
-    printf '%s' "${prompt//__PLAN_GOAL__/$goal}"
 }
 
-show_plan_prompt() {
-    local goal
+make_exec_task_prompt() {
+    cat <<'PROMPT'
+Role: Senior Modern C++ (C++20) Systems & CFD Engineer
+Context: Read `TASK_PLAN.md` and consult `STATE.md` if necessary for broader architectural conventions.
 
-    if command -v zenity >/dev/null 2>&1; then
-        goal=$(printf '' | zenity --text-info --editable \
-            --title="Please describe your issue" \
-            --text="Please describe your issue below:" \
-            --width=900 --height=500 2>/dev/null) || exit 0
-    else
-        goal=$(rofi -dmenu -i -p "Please describe your issue:" -matching fuzzy </dev/null) || exit 0
-    fi
+YOUR MISSION:
+Execute EXACTLY ONE atomic step from `TASK_PLAN.md`, verify it, update the checklist and log, and then stop immediately.
 
-    goal=$(trim_input "$goal")
-    [[ -n "$goal" ]] || exit 0
-
-    copy_and_paste_prompt "$(make_plan_prompt "$goal")"
+STRICT OPERATIONAL CONSTRAINTS:
+1. EXECUTE ONLY THE FIRST UNCHECKED STEP:
+   - Scan `TASK_PLAN.md` from top to bottom and find the VERY FIRST `- [ ]` item.
+   - Do NOT touch, preview, or implement anything related to subsequent steps.
+2. IMPLEMENT PRECISELY:
+   - Edit/create ONLY the files listed in that step's `Target Files`.
+   - Adhere strictly to the C++20 standard, project styling, and the step's `Specification`.
+   - Use clean, modular, production-ready code with English comments.
+3. VERIFY VIA COMPILATION:
+   - Run the exact command listed in the step's `Verification` section (e.g., build via `make` or the specified compiler flag).
+   - If the build fails, fix the code within the scope of this step until compilation succeeds.
+4. UPDATE `TASK_PLAN.md`:
+   - Change the completed step's status from `- [ ]` to `- [x]`.
+   - Under `## Execution Log`, append a concise log entry formatted as:
+     ### [Step ID & Title] - Completed
+     - **Files Modified:** List modified files.
+     - **Changes:** Brief summary of implemented methods/classes.
+     - **Verification Status:** Pass (include build/test output snippet).
+5. STOP IMMEDIATELY:
+   - Do NOT proceed to the next step under any circumstances.
+   - Output a brief summary in the chat informing Amir that this specific step is done and ready for review.
+PROMPT
 }
 
 make_commit_changes_prompt() {
@@ -411,15 +435,16 @@ show_main_project_prompts_menu() {
     local chosen_action
 
     chosen_action=$(
-        printf '%s\n' "$AGENTS_ACTION" "$LIST_ACTION" "$AGENT_STEP_ACTION" "$PLAN_ACTION" |
+        printf '%s\n' "$AGENTS_ACTION" "$LIST_ACTION" "$AGENT_REPORT_ACTION" "$TASK_PLAN_ACTION" "$EXEC_TASK_ACTION" |
             rofi -dmenu -i -no-custom -p "Main Project Prompts:" -matching fuzzy
     )
 
     case "$chosen_action" in
         "$LIST_ACTION") copy_and_paste_prompt "$(make_list_prompt)" ;;
         "$AGENTS_ACTION") copy_and_paste_prompt "$(make_agents_prompt)" ;;
-        "$AGENT_STEP_ACTION") copy_and_paste_prompt "$(make_agent_step_prompt)" ;;
-        "$PLAN_ACTION") show_plan_prompt ;;
+        "$AGENT_REPORT_ACTION") copy_and_paste_prompt "$(make_agent_report_prompt)" ;;
+        "$TASK_PLAN_ACTION") copy_and_paste_prompt "$(make_task_plan_prompt)" ;;
+        "$EXEC_TASK_ACTION") copy_and_paste_prompt "$(make_exec_task_prompt)" ;;
     esac
 }
 

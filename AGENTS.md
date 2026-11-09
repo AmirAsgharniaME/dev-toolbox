@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-This repository contains standalone Linux desktop utilities. `prompt_picker/prompt_picker.sh` is the Rofi picker, with setup and usage notes in `prompt_picker/README.md`. `prompt_helper/prompt_helper.sh` opens a Zenity prompt and uses `prompt_helper/refine_prompt.py` to refine it through the GapGPT API. `translator/run_translator.sh` launches `translator/translator.py`, which polishes selected or piped text through the GapGPT API. The root `README.md` gives the project overview; `LICENSE` contains licensing terms. The root `FILEPATH.md` is the pipe-separated project inventory (`TYPE | LABEL | PATH`), used to populate file menus and prompts. Keep it synchronized with project files as described below. There is no separate asset or test tree at present.
+This repository contains standalone Linux desktop utilities. `prompt_picker/prompt_picker.sh` is the Rofi picker, with setup and usage notes in `prompt_picker/README.md`. Its Main Project Prompts menu generates prompts for updating `AGENTS.md` and `FILEPATH.md`, creating `AGENT_REPORT.md` and `TASK_PLAN.md`, and executing the first unchecked task-plan step. `prompt_helper/prompt_helper.sh` opens a Zenity prompt and uses `prompt_helper/refine_prompt.py` to refine it through the GapGPT API. `translator/run_translator.sh` launches `translator/translator.py`, which polishes selected or piped text through the GapGPT API. The root `README.md` gives the project overview; `LICENSE` contains licensing terms. The root `FILEPATH.md` is the pipe-separated project inventory (`TYPE | LABEL | PATH`), used to populate file menus and prompts. Keep it synchronized with project files as described below. There is no separate asset or test tree at present.
 
 ## Build, Test, and Development Commands
 
@@ -13,7 +13,7 @@ cd prompt_picker
 bash prompt_picker.sh
 ```
 
-For direct execution, use `chmod +x prompt_picker.sh` once, then `./prompt_picker.sh`. It needs Bash 4+ and Rofi. `xdotool`, `xprop`, and either `xclip` or `xsel` provide full window and clipboard behavior; `notify-send` is optional. The Plan prompt uses Zenity for its multiline issue or goal editor and falls back to a single-line Rofi input when Zenity is unavailable. To check Bash syntax after editing, run `bash -n prompt_picker/prompt_picker.sh`.
+For direct execution, use `chmod +x prompt_picker.sh` once, then `./prompt_picker.sh`. It needs Bash 4+ and Rofi. `xdotool`, `xprop`, and either `xclip` or `xsel` provide full window and clipboard behavior; `notify-send` is optional. To check Bash syntax after editing, run `bash -n prompt_picker/prompt_picker.sh`.
 
 Run the prompt helper with `bash prompt_helper/prompt_helper.sh`. It needs Zenity, Python 3 with the `requests` package, `xclip`, and `xdotool`. The refiner reads `GAPGPT_API_KEY` first; if it is unset or empty, it reads the key from `prompt_helper/.gapgpt_key`. Keep that local key file private and out of version control. Check its Bash syntax with `bash -n prompt_helper/prompt_helper.sh`.
 
@@ -33,7 +33,7 @@ Check and update the root `FILEPATH.md` in the same change whenever a project fi
 
 ## Testing Guidelines
 
-No test framework or coverage requirement is defined. For script changes, at minimum run the syntax check above. When changing interactive behavior, manually exercise the relevant Rofi flow in a Linux X11 session with the required tools installed. For the Prompt Picker Plan flow, check both the Zenity multiline editor and the single-line Rofi fallback when practical; do not treat manual checks as automated tests.
+No test framework or coverage requirement is defined. For script changes, at minimum run the syntax check above. When changing interactive behavior, manually exercise the relevant Rofi flow in a Linux X11 session with the required tools installed. Do not treat manual checks as automated tests.
 
 ## Commit & Pull Request Guidelines
 

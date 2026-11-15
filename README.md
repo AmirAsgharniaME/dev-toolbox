@@ -42,6 +42,7 @@ prompt_helper/   Zenity prompt refiner and its guide
 translator/      Text translator and its guide
 FILEPATH.md      Project file inventory
 AGENTS.md        Repository instructions
+STATE.md         Current repository status
 ```
 
 There is no build system or automated test suite. For repository guidance and Bash syntax-check commands, see [`AGENTS.md`](AGENTS.md).

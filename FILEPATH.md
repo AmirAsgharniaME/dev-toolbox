@@ -8,6 +8,7 @@ MD | License | LICENSE
 MD | Readme | README.md
 MD | Agents | AGENTS.md
 MD | Filepath | FILEPATH.md
+MD | State | STATE.md
 MD | Readme | prompt_picker/README.md
 MD | Readme | prompt_helper/README.md
 MD | Readme | translator/README.md

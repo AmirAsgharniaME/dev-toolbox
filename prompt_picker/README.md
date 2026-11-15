@@ -62,11 +62,11 @@ Select a file from the Rofi menu. Then choose an action, or choose **Add File Pa
 - Open the Git prompts menu
 - Open the main project prompts menu, including the AGENTS.md and file list prompts, the priority-3 Create STATE.md prompt, AGENT_REPORT.md and TASK_PLAN.md prompts, Exec-Task, and the last-priority Update STATE.md prompt
 
-The priority-3 **Create STATE.md** option generates a prompt to inspect the codebase and create a fact-driven architectural and FVM state ledger in the project root.
+The priority-3 **Create STATE.md** option generates a prompt to rewrite `STATE.md` as a fact-based, project-specific status reference, with a stable section structure, open questions for unverifiable details, and a dated change log.
 The **Create AGENT_REPORT.md** option generates a prompt for a fresh architectural report using a fixed five-section structure, without modifying C++ source files.
 The **Create TASK_PLAN.md** option generates a prompt to overwrite `TASK_PLAN.md` with a self-contained, atomic execution checklist derived from `AGENT_REPORT.md`, without modifying C++ source files.
 The **Exec-Task** option generates a prompt to execute only the first unchecked step in `TASK_PLAN.md`, verify it using that step's command, and update the checklist and execution log.
-The final **Update STATE.md** option generates a prompt to update `STATE.md` from completed task-plan evidence, the execution log, and verified code changes.
+The final **Update STATE.md** option generates a prompt to update `STATE.md` incrementally from the last change-log entry, using Git history and repository evidence while preserving the existing section structure.
 
 The Git menu can create commit, push, branch, and file operation prompts. It generates prompt text; it does not execute Git commands itself. File remove, rename, and move actions collect paths and generate a prompt for an AI assistant.
 

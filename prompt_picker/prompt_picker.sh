@@ -202,57 +202,13 @@ PROMPT
 
 make_create_state_prompt() {
     cat <<'PROMPT'
-Role: Principal C++ CFD Software Architect
-Task: Reverse-engineer the current codebase and establish the foundational `STATE.md` (Ground Truth Ledger).
+The project state file at the path STATE.md should comprehensively describe the current status of the project. It must enable an AI assistant to easily understand and provide insights regarding any changes or issues I might raise, minimizing the need to reference multiple files. The assistant should be well-informed about the governing rules of the project and my approach, allowing it to accurately anticipate potential problems.
 
-Context & Premise:
-This is a Computational Fluid Dynamics (CFD) project implemented in Modern C++ using the Finite Volume Method (FVM). Some core modules, data structures, or drivers have already been implemented, but the project now requires a single, authoritative architectural ledger (`STATE.md`) to guide future development.
+Base the content on what is actually in the repository — the source tree, build files, tests, examples, existing docs, and the git history — not on assumptions. Choose the section structure yourself, based on what kind of project this is; state the layout you chose briefly at the top of the file so later updates know where things belong. Where something is unclear or you cannot verify it from the repository, record it as an open question rather than filling the gap with a guess.
 
-Inspection Strategy (Do this thoroughly before writing):
-1. Build System & Toolchain: Inspect CMakeLists.txt, Makefiles, or build scripts to determine C++ standard (C++17/20), dependencies, compiler flags, and target layout (libraries vs. executables/examples).
-2. Codebase Topology: Map the physical directory structure under `include/`, `src/`, `apps/`, `tests/`, etc.
-3. Geometric & Mesh Layer: Inspect mesh representations, cell/face topologies, connectivity, boundary patch representations, and dimensionality (1D, 2D, 3D, structured, or unstructured).
-4. Discrete Fields & Stencils: Identify scalar/vector field abstractions, geometric associations (cell-centered vs. face-centered), and interpolation/gradient schemes.
-5. FVM Discretization & Operators: Identify implemented physical operators (e.g., diffusion/Laplacian, convection/divergence, transient terms, source terms), face flux evaluations, sign conventions, and boundary condition handling.
-6. Linear Algebra & Assembly Seam: Inspect linear system abstractions (matrix formats, sparse/tridiagonal storage, solvers, preconditioners) and how operator fluxes are assembled into the matrix.
-7. Verification & Drivers: Review existing application drivers, benchmarks, unit tests, or contract validation checks to understand verified capabilities.
+This file will be updated incrementally after future changes, so keep the structure stable and section-based, keep points short enough that a single item can be edited or removed, and include a dated change log at the end. Record decisions that still hold, not the discussion that led to them; refer to a file by path instead of copying its contents.
 
-Output Specification:
-Create `STATE.md` directly in the project root with the following structured sections:
-
-# Project State & Architecture Ledger (STATE.md)
-
-## 1. Executive Summary & Design Philosophy
-- High-level scope, design paradigm (e.g., OpenFOAM-style modularity, client-first design, direction-agnostic face formulation), and current maturity stage.
-
-## 2. Technical Stack & Toolchain
-- Language standard, supported compilers, build system architecture, external dependencies (if any, or pure zero-dependency standard C++).
-
-## 3. Architecture & Directory Topology
-- Concrete breakdown of directories and layer decoupling (e.g., core math/geometry vs. numerical operators vs. applications).
-
-## 4. Mathematical & FVM Discretization State
-- Formal governing equation forms currently supported.
-- Sign and flux conventions (outward normal vectors, intrinsic face orientations, LHS/RHS partitioning).
-- Implemented operator formulations (diffusion, convection, source, time schemes).
-- Boundary condition abstraction and mathematical mapping (Dirichlet, Neumann, mixed).
-
-## 5. Data Structures & Assembly Seam
-- Detailed inventory of core classes (Mesh, Fields, Matrix, Solvers) with their exact modern C++ API signatures and memory layout.
-- Interface contract between spatial FVM operators and linear algebraic matrix assembly.
-
-## 6. Verification Status & Verified Baselines
-- Inventory of existing application drivers, tests, and benchmark problems with their verification state and known reference metrics.
-
-## 7. Known Technical Debt & Immediate Roadmap
-- Clear separation between what is solidly implemented vs. what is placeholder/hardcoded or missing.
-- Architectural candidates for the next development milestones.
-
-Constraints:
-- Strictly English output.
-- Fact-driven only: Deduce every statement from the actual code. Do NOT speculate, hallucinate methods that do not exist, or assume unverified physical features.
-- Write modern, rigorous CFD engineering documentation with clear mathematical precision (using LaTeX notation where applicable).
-- Write the result directly to `STATE.md`.
+Please rewrite the file to meet these requirements.
 PROMPT
 }
 
@@ -290,27 +246,19 @@ PROMPT
 
 make_state_update_prompt() {
     cat <<'PROMPT'
-Role: Senior C++ CFD Software Architect
-Task: Systematically synchronize and update `STATE.md` to reflect the completed milestone.
+Update the project state file at STATE.md to match the current repository. Do not rewrite the file from scratch.
 
-Objective:
-`STATE.md` is the single source of truth for the project's architectural, mathematical, and implementation state. Your goal is to inspect the completed work, deduce the exact architectural shifts and newly verified capabilities, and update `STATE.md` in-place.
+Scope: use the last entry in the change log as the anchor. Run git status, git diff, and git log since that date to find what was added, modified, or removed. Read the affected source files as needed. Change only what is now inaccurate, and add only what is new.
 
-Workflow & Context to Inspect:
-1. Ground Truth Baseline: Read the current `STATE.md`.
-2. Completed Execution Evidence: Read `TASK_PLAN.md` (especially all completed checkmarks and the appended `## Execution Log`).
-3. Code Inspection: Use `git diff` or inspect the modified/created source and header files referenced in the execution log to verify actual method signatures and implementation reality.
+Preserve the structure: keep the section layout that is already in the file, and keep the existing wording of anything that is still true. Do not reorganize, retitle, or renumber sections. If a change does not fit any existing section, add the smallest new item or subsection you need rather than restructuring the file — and note the addition in your report.
 
-Update Guidelines:
-- Preserve Structure: Retain the established sections, tone, and formatting of `STATE.md`. Do not wipe out historic architectural foundations.
-- Architectural Precision: Document newly introduced classes, APIs, mathematical formulations, or design patterns exactly as implemented (no guessing or pseudo-code).
-- Verification & Benchmarks: Record concrete verification evidence (compilation passes, numerical parity checks, stdout byte comparisons) reported in the execution log.
-- Clean Evolution: Update the current project status, remove obsolete technical debt notes that were resolved, and set the stage for upcoming architectural priorities based on the project roadmap.
+Before editing: check that what is already written still holds, and specifically that paths, build options, class and function names, and option defaults match the code as it is now. Remove or correct entries that are no longer true rather than leaving them as history; history belongs only in the change log.
 
-Constraints:
-- Strictly English output for markdown documentation.
-- Rely ONLY on verified facts from the codebase and execution logs.
-- Apply changes directly to `STATE.md`.
+Then: update the status/next-steps sections to reflect what is now done versus what remains, and append one dated change log entry that summarizes this batch. If anything you encountered cannot be verified from the repository, add it under the open questions section instead of guessing.
+
+Do not change any code, build files, or other documents. Do not record chat discussion — only decisions that still hold.
+
+Report: list the sections you changed, the change log entry you added, and anything you placed under open questions.
 PROMPT
 }
 

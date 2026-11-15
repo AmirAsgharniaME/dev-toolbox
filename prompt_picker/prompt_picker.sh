@@ -103,6 +103,7 @@ AGENT_REPORT_ACTION="4. Create AGENT_REPORT.md"
 TASK_PLAN_ACTION="5. Create TASK_PLAN.md"
 EXEC_TASK_ACTION="6. Exec-Task"
 STATE_ACTION="7. Update STATE.md"
+FIX_MARKDOWN_ACTION="8. Fix Markdown"
 DELETE_BRANCH_ACTION="Delete Current Branch"
 GIT_PROMPTS_ACTION="1. Git Prompts"
 MAIN_PROJECT_PROMPTS_ACTION="2. Main Project Prompts"
@@ -260,6 +261,140 @@ Do not change any code, build files, or other documents. Do not record chat disc
 
 Report: list the sections you changed, the change log entry you added, and anything you placed under open questions.
 PROMPT
+}
+
+make_fix_markdown_prompt() {
+    local file_path="$1"
+    local template
+
+    template=$(cat <<'PROMPT'
+# ROLE
+You are `markdown-math-render-fixer`: a repair tool for Markdown files whose
+LaTeX math fails to render. You receive a file path. You return the same file
+with render-breaking structure corrected and nothing else changed.
+
+# INPUT
+
+TARGET FILE PATH: 'User File Path'
+
+Read the file at that exact path. Treat it as the single source of truth
+for this run: every edit is applied to that document, and the corrected
+version is returned whole. Do not look for any other file, do not ask for
+a second path, and do not infer the location from context.
+
+
+# ABSOLUTE CONSTRAINTS
+- Do NOT rewrite prose, reword sentences, translate, or "improve" the math.
+- Do NOT change symbols, subscripts, variable names, or equation content.
+- Do NOT reorder sections, renumber headings, or restructure arguments.
+- Every byte outside the specific edits below must be identical to the input.
+- If you are unsure whether a change is needed, leave it and list it in the
+  report under "needs human review". Conservative is correct.
+
+# HARD RULES (apply in this priority order)
+
+R1 — FATAL. Display math must start at column 0.
+  A line whose first non-space characters are `$$` may have NO leading
+  whitespace. Zero indentation, always.
+
+R2 — FATAL. No `$$` block may live inside a list item or a blockquote.
+  Detection: a `$$` opener that is indented, OR that appears after a list
+  marker (`-`, `*`, `+`, `1.`) with no intervening blank line at column 0.
+  Repair:
+    a. The lead-in line that introduced the block becomes a plain paragraph.
+       If that lead-in was a bullet, drop the bullet marker.
+       If it was a numbered item, absorb the number into bold text:
+         `1. **At the Right Boundary** ( $x = L$ ):`  ->  `**1. At the Right Boundary** ( $x = L$ ):`
+       Keep trailing colons.
+    b. Dedent the `$$` block to column 0.
+    c. Put exactly one blank line before the opener and one after the closer.
+    d. If the lead-in line was a nested bullet existing only to host the math,
+       remove the nesting entirely (R12 does not protect it here).
+
+R3 — Every `$$` block is exactly three parts: opener line, content lines,
+  closer line. Blank line before the opener, blank line after the closer.
+  Never `$$ content $$` on one line; split it.
+
+R4 — Blank line immediately after every ATX heading (`#`–`######`) and
+  immediately before it. A heading glued to the next paragraph swallows it
+  in most renderers.
+
+R5 — Inline math adjacent to parentheses needs one space inside the parens:
+    `($x=0$)`   ->  `( $x=0$ )`
+    `($\phi_b \approx \phi_P$)`  ->  `( $\phi_b \approx \phi_P$ )`
+  Applies everywhere, including inside headings. Do not add spaces around `$`
+  where the neighbor is ordinary punctuation like a comma or period.
+
+R6 — Blank line before the first item of any list and after the last item of
+  any list, whenever a paragraph or heading follows.
+
+R7 — `$` parity: within each paragraph or list item, the count of unescaped
+  `$` must be even. Odd count = broken inline math. Report the line, do not
+  guess a fix unless the intended formula is unambiguous from context.
+
+R8 — `\left` and `\right` must pair within the same math span. A stray
+  `\left.` with no matching `\right` (or vice versa) breaks the whole block.
+  Fix only when the correct pairing is obvious; otherwise report.
+
+R9 — No display math inside a table cell. Convert to inline `$...$`, or move
+  the equation below the table with a reference.
+
+R10 — Inside a table cell, a literal `|` within inline math must be written
+  `\vert`, otherwise the cell splits.
+
+R11 — Escape `$` used as currency or a literal dollar sign as `\$`.
+
+R12 — Preserve all other list indentation exactly. Nested bullets that are
+  genuine content structure stay nested; only strip nesting that exists
+  solely to host display math.
+
+# DO NOT TOUCH
+These constructs render fine in practice and must be left alone unless a
+`$`-balance or `\left`/`\right` error independently proves them broken:
+  - `\mathrel{+}=` and other `\mathrel{...}` uses
+  - `\right\vert`, `\vert`, `\Vert`, `\lvert`, `\rvert`
+  - `\mathrm{...}` containing commas or hyphens, e.g. `\mathrm{conv,out}`
+  - `\stackrel{?}{=}`, `\overset`, `\underset`
+  - spacing commands `\,` `\;` `\quad` `\qquad`
+  - `\mathbf`, `\boldsymbol`, `\nabla`, `\partial`
+  - any custom macro already defined in the file's preamble
+Do not "normalize" these for style. They are not your job.
+
+# PROCEDURE
+1. PRE-SCAN. Read the file and output:
+   - total line count
+   - number of `$$` blocks, and how many are indented
+   - number of ATX headings without a blank line after them
+   - number of `$`-parity violations
+   - number of unpaired `\left`/`\right`
+2. EDIT. Apply R1–R12 top to bottom in a single pass. Note the original line
+   number of every changed line.
+3. POST-SCAN. Repeat the pre-scan checks on your output. All five counters
+   must be zero. If any is non-zero, fix it before answering.
+4. DIFF-QUIT. Confirm the change set contains only lines justified by R1–R12.
+   If you touched a line for style alone, revert it.
+
+# OUTPUT FORMAT
+**Verdict:** one line — `RENDER-SAFE` or `FIXED (n edits)` or `PARTIAL (needs review)`.
+
+**Change log:** a table, one row per edit:
+| line | rule | before | after |
+
+**Full file:** the complete corrected Markdown in a single fenced block,
+unchanged from the source except for the logged edits.
+
+**Needs review:** only genuine ambiguities. Do not pad this list with
+constructs you already decided were fine.
+
+# VERIFICATION ONE-LINERS (for scripted use)
+    grep -nE '^[[:space:]]+\$\$' file.md     # must print nothing (R1/R2)
+    grep -c '^\$\$' file.md                  # must be even
+    grep -nE '^#{1,6} .*\S' -A1 file.md      # check blank line after headings
+PROMPT
+)
+
+    printf '%s%s' "${template%%User File Path*}" "$file_path"
+    printf '%s' "${template#*User File Path}"
 }
 
 make_commit_changes_prompt() {
@@ -487,9 +622,10 @@ show_delete_branch_message() {
 
 show_main_project_prompts_menu() {
     local chosen_action
+    local file_path
 
     chosen_action=$(
-        printf '%s\n' "$AGENTS_ACTION" "$LIST_ACTION" "$CREATE_STATE_ACTION" "$AGENT_REPORT_ACTION" "$TASK_PLAN_ACTION" "$EXEC_TASK_ACTION" "$STATE_ACTION" |
+        printf '%s\n' "$AGENTS_ACTION" "$LIST_ACTION" "$CREATE_STATE_ACTION" "$AGENT_REPORT_ACTION" "$TASK_PLAN_ACTION" "$EXEC_TASK_ACTION" "$STATE_ACTION" "$FIX_MARKDOWN_ACTION" |
             rofi -dmenu -i -no-custom -p "Main Project Prompts:" -matching fuzzy
     )
 
@@ -501,6 +637,11 @@ show_main_project_prompts_menu() {
         "$TASK_PLAN_ACTION") copy_and_paste_prompt "$(make_task_plan_prompt)" ;;
         "$EXEC_TASK_ACTION") copy_and_paste_prompt "$(make_exec_task_prompt)" ;;
         "$STATE_ACTION") copy_and_paste_prompt "$(make_state_update_prompt)" ;;
+        "$FIX_MARKDOWN_ACTION")
+            file_path=$(rofi -dmenu -i -p "Markdown file path:" -matching fuzzy)
+            [[ -n "$file_path" ]] || return 0
+            copy_and_paste_prompt "$(make_fix_markdown_prompt "$file_path")"
+            ;;
     esac
 }
 

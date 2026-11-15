@@ -21,7 +21,7 @@ Layout: this file is organized around repository purpose, implemented utilities,
 ## Utility Behavior and Constraints
 
 - Prompt Picker discovers `FILEPATH.md` (with legacy filename fallbacks), builds file-specific, project-maintenance, and Git prompt menus, and copies generated prompts to the clipboard. It can restore the previously active window and paste when the X11 tools are available.
-- Prompt Picker's main project menu offers prompts for `AGENTS.md`, `FILEPATH.md`, `STATE.md`, `AGENT_REPORT.md`, and `TASK_PLAN.md`, plus execution of the first unchecked task-plan step. Those prompts generate instructions; the picker does not perform the requested repository edits itself.
+- Prompt Picker's main project menu offers prompts for `AGENTS.md`, `FILEPATH.md`, `STATE.md`, `AGENT_REPORT.md`, and `TASK_PLAN.md`, plus execution of the first unchecked task-plan step and a Markdown math-render repair prompt for a user-selected path. Those prompts generate instructions; the picker does not perform the requested repository edits itself.
 - Prompt Helper gathers editable text in Zenity, sends it to the GapGPT chat completions API, and copies/pastes the returned English prompt. It uses `GAPGPT_API_KEY` before its local key file and currently invokes its Python script through an absolute path.
 - Translator sends text to the GapGPT chat completions API, then prints and copies the polished result. The Python entry point accepts an argument, piped standard input, or X11 primary selection; its launcher reads the clipboard and invokes the script through an absolute path.
 - Prompt Helper and Translator use model `gpt-4o-mini-2024-07-18`; their request timeouts are 30 and 20 seconds respectively. These are implementation defaults, not project-wide API guarantees.
@@ -38,9 +38,9 @@ Layout: this file is organized around repository purpose, implemented utilities,
 
 ## Current Git State
 
-- At the baseline inspected for this file, the checked-out branch is `main`, tracking `origin/main`, and the working tree was clean.
-- The repository has 16 commits from `bd2f52d` (`Initial commit`) through `4b5fd9d` (`feat(prompt-picker): revise state prompts`). Recent work added project-planning and state prompts to Prompt Picker and refreshed the root README.
-- Git history is the source of truth for changes; the `AGENTS.md` statement that history contains only the initial commit is outdated.
+- The checked-out branch is `main`, tracking `origin/main`; the working tree currently has uncommitted modifications to `AGENTS.md`, `STATE.md`, `prompt_picker/README.md`, and `prompt_picker/prompt_picker.sh`.
+- The repository has 17 commits from `bd2f52d` (`Initial commit`) through `bdfe3df` (`docs(repo): document project state`). Recent committed work added project-planning and state prompts to Prompt Picker and documented the project state. The current uncommitted Prompt Picker change adds a `Fix Markdown` main-project menu option that asks for a Markdown path and generates a math-render repair prompt; the related README documents it, and `AGENTS.md` now includes it in the project structure description.
+- Git history is the source of truth for changes.
 
 ## Verification and Known Limitations
 
@@ -52,9 +52,9 @@ Layout: this file is organized around repository purpose, implemented utilities,
 ## Open Questions
 
 - `translator/README.md` describes selecting text and replacing the selection, but `translator/run_translator.sh` reads the clipboard and does not itself capture or replace a selection. Confirm whether the README or launcher behavior should be corrected.
-- `AGENTS.md` says the Git history has only the initial commit, although the current repository contains 16 commits. Confirm whether that guidance should be corrected in a separate documentation update.
 - Prompt Picker can search for `FILEPATH.md` in the active project's process tree, but the repository does not document all process-discovery edge cases; verify from an X11 session if a reported issue depends on that behavior.
 
 ## Change Log
 
 - 2026-11-15: Created this repository-grounded status reference and added `STATE.md` to the project inventory. Recorded current utility behavior, governing workflow rules, verified Git baseline, and documentation questions.
+- 2026-11-15: Updated the state for the new Prompt Picker Fix Markdown prompt, current 17-commit Git history and dirty working tree; recorded the `AGENTS.md` history correction, removed its resolved open question, and retained the unverified translator documentation and process-discovery questions.

@@ -104,6 +104,7 @@ TASK_PLAN_ACTION="5. Create TASK_PLAN.md"
 EXEC_TASK_ACTION="6. Exec-Task"
 STATE_ACTION="7. Update STATE.md"
 FIX_MARKDOWN_ACTION="8. Fix Markdown"
+SCIENTIFIC_COPY_EDITOR_ACTION="9. Scientific Copy Editor"
 DELETE_BRANCH_ACTION="Delete Current Branch"
 GIT_PROMPTS_ACTION="1. Git Prompts"
 MAIN_PROJECT_PROMPTS_ACTION="2. Main Project Prompts"
@@ -397,6 +398,51 @@ PROMPT
     printf '%s' "${template#*User File Path}"
 }
 
+make_scientific_copy_editor_prompt() {
+    local target_file="$1"
+    local template
+
+    template=$(cat <<'PROMPT'
+Edit TARGET_FILE to improve its technical and scientific writing. Change only the wording and punctuation of prose. Follow RULES_FILE at all times.
+
+TARGET_FILE: [put the file name here]
+RULES_FILE: Markdown_Rules.md
+
+Priority:
+- If a writing fix conflicts with any rule in RULES_FILE, follow RULES_FILE and skip the fix.
+- Keep every formatting rule in RULES_FILE. This includes `$$` placement, `\mkern3mu`, `$`...`$` inline form, equation numbering `\qquad (n)`, and the "Eq. (n)" references.
+
+Fix these in the prose (text outside math):
+1. Spelling, grammar, and typos.
+2. Punctuation: colon (:) only before a list, a formula, or an explanation. Do not use it after a verb or inside a sentence that continues directly. Use a comma or period where needed. Use correct spacing around punctuation.
+3. Incorrect or informal words and phrases (for example "ها", "خیلی", "a lot", "stuff", "etc."). Replace them with precise technical terms.
+4. Verb forms and tense: present tense for established facts and definitions, past tense for what was done in a study or derivation. Keep the same meaning.
+5. Clear sentence structure. Split run-on sentences only when this makes them clearer. Use "respectively", "i.e.", "e.g.", and "where ... denotes" correctly.
+6. Consistent terminology. Use the same term for the same concept throughout the file.
+7. Each symbol is defined before or at its first use. Do not invent definitions. If a symbol is undefined, list it in the reply.
+8. Precise claims. Replace vague wording such as "very large" or "it is clear that" with the exact wording from the source text, or keep the original if no precise wording is given. Do not add new claims.
+
+Do not change:
+- Any number, unit value, equation, LaTeX command, variable name, citation, or equation/figure/table number.
+- Any heading level, list structure, or section order.
+- The meaning of any sentence.
+- Any text inside math delimiters.
+- Any item that already follows the rules and reads correctly.
+
+Procedure:
+1. Read RULES_FILE and TARGET_FILE completely.
+2. Make each prose fix with the edit tool. Group nearby changes into one edit.
+3. Edit TARGET_FILE directly. Do not print the file or the changes in the chat.
+4. Reply in one short line: the number of changes made, plus a list of unclear items. Each unclear item names the location and the reason, for example "undefined symbol $\Gamma$ in section 3" or "sentence in section 2 may be missing a subject; not changed".
+PROMPT
+)
+
+    printf '%sTARGET_FILE: %s%s' \
+        "${template%%TARGET_FILE: \[put the file name here\]*}" \
+        "$target_file" \
+        "${template#*TARGET_FILE: \[put the file name here\]}"
+}
+
 make_commit_changes_prompt() {
     cat <<'PROMPT'
 Please inspect the current git status and git diff of my C++ CFD project. Based on the latest modifications, perform the following steps precisely:
@@ -625,7 +671,7 @@ show_main_project_prompts_menu() {
     local file_path
 
     chosen_action=$(
-        printf '%s\n' "$AGENTS_ACTION" "$LIST_ACTION" "$CREATE_STATE_ACTION" "$AGENT_REPORT_ACTION" "$TASK_PLAN_ACTION" "$EXEC_TASK_ACTION" "$STATE_ACTION" "$FIX_MARKDOWN_ACTION" |
+        printf '%s\n' "$AGENTS_ACTION" "$LIST_ACTION" "$CREATE_STATE_ACTION" "$AGENT_REPORT_ACTION" "$TASK_PLAN_ACTION" "$EXEC_TASK_ACTION" "$STATE_ACTION" "$FIX_MARKDOWN_ACTION" "$SCIENTIFIC_COPY_EDITOR_ACTION" |
             rofi -dmenu -i -no-custom -p "Main Project Prompts:" -matching fuzzy
     )
 
@@ -641,6 +687,11 @@ show_main_project_prompts_menu() {
             file_path=$(rofi -dmenu -i -p "Markdown file path:" -matching fuzzy)
             [[ -n "$file_path" ]] || return 0
             copy_and_paste_prompt "$(make_fix_markdown_prompt "$file_path")"
+            ;;
+        "$SCIENTIFIC_COPY_EDITOR_ACTION")
+            file_path=$(rofi -dmenu -i -p "Target file path:" -matching fuzzy </dev/null)
+            [[ -n "$file_path" ]] || return 0
+            copy_and_paste_prompt "$(make_scientific_copy_editor_prompt "$file_path")"
             ;;
     esac
 }

@@ -271,17 +271,16 @@ make_fix_markdown_prompt() {
     template=$(cat <<'PROMPT'
 # ROLE
 You are `markdown-math-render-fixer`: a repair tool for Markdown files whose
-LaTeX math fails to render. You receive a file path. You return the same file
+LaTeX math fails to render. You receive one or more file paths. Return each file
 with render-breaking structure corrected and nothing else changed.
 
 # INPUT
 
-TARGET FILE PATH: 'User File Path'
+TARGET FILE PATHS: User File Path
 
-Read the file at that exact path. Treat it as the single source of truth
-for this run: every edit is applied to that document, and the corrected
-version is returned whole. Do not look for any other file, do not ask for
-a second path, and do not infer the location from context.
+Read each file at the exact paths listed above, separated by And. Apply the
+procedure to each document independently and return each corrected version
+whole. Do not infer additional paths from context.
 
 
 # ABSOLUTE CONSTRAINTS
@@ -362,6 +361,7 @@ These constructs render fine in practice and must be left alone unless a
 Do not "normalize" these for style. They are not your job.
 
 # PROCEDURE
+For each target file:
 1. PRE-SCAN. Read the file and output:
    - total line count
    - number of `$$` blocks, and how many are indented
@@ -376,6 +376,7 @@ Do not "normalize" these for style. They are not your job.
    If you touched a line for style alone, revert it.
 
 # OUTPUT FORMAT
+Provide the following for each target file, identified by its path:
 **Verdict:** one line — `RENDER-SAFE` or `FIXED (n edits)` or `PARTIAL (needs review)`.
 
 **Change log:** a table, one row per edit:
@@ -403,37 +404,44 @@ make_scientific_copy_editor_prompt() {
     local template
 
     template=$(cat <<'PROMPT'
-Edit TARGET_FILE to improve its technical and scientific writing. Change only the wording and punctuation of prose. Follow RULES_FILE at all times.
+Copy-edit TARGET_FILE for technical and scientific writing. Change only the wording and punctuation of prose, and make the whole file consistent. Follow RULES_FILE at all times.
 
 TARGET_FILE: [put the file name here]
 RULES_FILE: Markdown_Rules.md
 
 Priority:
-- If a writing fix conflicts with any rule in RULES_FILE, follow RULES_FILE and skip the fix.
-- Keep every formatting rule in RULES_FILE. This includes `$$` placement, `\mkern3mu`, `$`...`$` inline form, equation numbering `\qquad (n)`, and the "Eq. (n)" references.
+- If a prose fix conflicts with any rule in RULES_FILE, follow RULES_FILE and skip the fix.
+- Keep every formatting rule in RULES_FILE, including `$$` placement, `\mkern3mu`, the `` $`...`$ `` inline form, `\qquad (n)` numbering, and "Eq. (n)" references.
+- Never change the meaning of a sentence to make it read better.
 
-Fix these in the prose (text outside math):
-1. Spelling, grammar, and typos.
-2. Punctuation: colon (:) only before a list, a formula, or an explanation. Do not use it after a verb or inside a sentence that continues directly. Use a comma or period where needed. Use correct spacing around punctuation.
-3. Incorrect or informal words and phrases (for example "ها", "خیلی", "a lot", "stuff", "etc."). Replace them with precise technical terms.
-4. Verb forms and tense: present tense for established facts and definitions, past tense for what was done in a study or derivation. Keep the same meaning.
-5. Clear sentence structure. Split run-on sentences only when this makes them clearer. Use "respectively", "i.e.", "e.g.", and "where ... denotes" correctly.
-6. Consistent terminology. Use the same term for the same concept throughout the file.
-7. Each symbol is defined before or at its first use. Do not invent definitions. If a symbol is undefined, list it in the reply.
-8. Precise claims. Replace vague wording such as "very large" or "it is clear that" with the exact wording from the source text, or keep the original if no precise wording is given. Do not add new claims.
+Procedure:
+1. Back up TARGET_FILE to TARGET_FILE + ".bak" before any edit.
+2. Read RULES_FILE and TARGET_FILE completely. List every symbol, term, and abbreviation, and note where each is defined.
+3. Make the prose fixes below with the edit tool. Group nearby changes into one edit.
+4. Edit TARGET_FILE directly. Do not print the file or the changes in the chat.
+5. Reply with a short summary: the number of edits made, then one line for each flagged item, giving its location and reason.
+
+Prose fixes (text outside math):
+1. Fix spelling, grammar, punctuation, and spacing around punctuation.
+2. Use a colon (:) only before a list, a formula, or a statement that explains what precedes it. Never use it after a verb or where the sentence continues directly. Replace other colons with a period or comma as needed.
+3. Replace informal or vague words (for example "a lot", "stuff", "etc.", "very", "clearly") with precise wording that has the same meaning. Do not add content.
+4. Verb tense: present tense for established facts and definitions, past tense for steps performed in a derivation or study. Keep the original meaning.
+5. Sentence structure: fix run-on sentences and unclear subjects. Split a sentence only when this makes it clearer. Do not add connectives unless the logic already requires them.
+6. Terminology: use one term per concept across the whole file. If two terms refer to the same concept, use the one that appears more often and change the others.
+7. Consistency: use the same symbol for the same quantity, the same unit spacing, the same forms for "Eq. (n)", "Figure n", and "Table n", and one spelling variant throughout (use the one that appears more often).
+8. Vague or overstated claims (for example "very large", "always", "it is clear that"): soften them to the level that the surrounding derivation supports, or flag them. Do not add new claims, numbers, or citations.
+
+Check and flag only (do not change):
+- A symbol used before its definition, or never defined. Do not invent a definition.
+- An "Eq. (n)" reference whose number does not match the intended equation, or that points to a missing equation.
+- Two statements that contradict each other, or a sign, unit, or variable whose meaning changes within the file.
+- A claim with no support in the file.
 
 Do not change:
 - Any number, unit value, equation, LaTeX command, variable name, citation, or equation/figure/table number.
-- Any heading level, list structure, or section order.
-- The meaning of any sentence.
+- Heading levels, list structure, or section order.
 - Any text inside math delimiters.
-- Any item that already follows the rules and reads correctly.
-
-Procedure:
-1. Read RULES_FILE and TARGET_FILE completely.
-2. Make each prose fix with the edit tool. Group nearby changes into one edit.
-3. Edit TARGET_FILE directly. Do not print the file or the changes in the chat.
-4. Reply in one short line: the number of changes made, plus a list of unclear items. Each unclear item names the location and the reason, for example "undefined symbol $\Gamma$ in section 3" or "sentence in section 2 may be missing a subject; not changed".
+- Any sentence that already follows the rules and reads correctly.
 PROMPT
 )
 
@@ -666,6 +674,38 @@ show_delete_branch_message() {
     copy_and_paste_prompt "$message"
 }
 
+select_prompt_target_files() {
+    local selected_line selected_type selected_label target_path
+    local targets=""
+
+    while true; do
+        if [[ -n "$FILE_PATH" ]]; then
+            selected_line=$(
+                printf '%s\n' "Done" "$FILE_MENU_LIST" |
+                    rofi -dmenu -i -no-custom -p "Select target file or Done:" -matching normal
+            ) || return 1
+            [[ "$selected_line" == "Done" ]] && break
+            [[ -n "$selected_line" ]] || return 1
+            parse_menu_line "$selected_line" selected_type selected_label target_path
+        else
+            target_path=$(printf '%s\n' "Done" |
+                rofi -dmenu -i -p "Enter target file path or choose Done:" -matching normal) || return 1
+            target_path=$(trim_input "$target_path")
+            [[ "$target_path" == "Done" ]] && break
+            [[ -n "$target_path" ]] || return 1
+        fi
+
+        if [[ -n "$targets" ]]; then
+            targets+=" And $target_path"
+        else
+            targets="$target_path"
+        fi
+    done
+
+    [[ -n "$targets" ]] || return 1
+    printf '%s' "$targets"
+}
+
 show_main_project_prompts_menu() {
     local chosen_action
     local file_path
@@ -684,13 +724,11 @@ show_main_project_prompts_menu() {
         "$EXEC_TASK_ACTION") copy_and_paste_prompt "$(make_exec_task_prompt)" ;;
         "$STATE_ACTION") copy_and_paste_prompt "$(make_state_update_prompt)" ;;
         "$FIX_MARKDOWN_ACTION")
-            file_path=$(rofi -dmenu -i -p "Markdown file path:" -matching fuzzy)
-            [[ -n "$file_path" ]] || return 0
+            file_path=$(select_prompt_target_files) || return 0
             copy_and_paste_prompt "$(make_fix_markdown_prompt "$file_path")"
             ;;
         "$SCIENTIFIC_COPY_EDITOR_ACTION")
-            file_path=$(rofi -dmenu -i -p "Target file path:" -matching fuzzy </dev/null)
-            [[ -n "$file_path" ]] || return 0
+            file_path=$(select_prompt_target_files) || return 0
             copy_and_paste_prompt "$(make_scientific_copy_editor_prompt "$file_path")"
             ;;
     esac

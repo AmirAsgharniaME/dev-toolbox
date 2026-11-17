@@ -67,8 +67,8 @@ The **Create AGENT_REPORT.md** option generates a prompt for a fresh architectur
 The **Create TASK_PLAN.md** option generates a prompt to overwrite `TASK_PLAN.md` with a self-contained, atomic execution checklist derived from `AGENT_REPORT.md`, without modifying C++ source files.
 The **Exec-Task** option generates a prompt to execute only the first unchecked step in `TASK_PLAN.md`, verify it using that step's command, and update the checklist and execution log.
 The final **Update STATE.md** option generates a prompt to update `STATE.md` incrementally from the last change-log entry, using Git history and repository evidence while preserving the existing section structure.
-The **Fix Markdown** option asks for a Markdown file path, then generates the supplied math-render repair prompt with that path inserted as its target.
-The final **Scientific Copy Editor** option asks for a target file path, then generates the technical and scientific writing prompt with that path inserted. The prompt directs the editor to follow `Markdown_Rules.md` and preserve math and document structure.
+The **Fix Markdown** and **Scientific Copy Editor** options show the project file list repeatedly. Select one or more files, then choose **Done** to generate the prompt with their paths separated by `And`. If no file list is available, enter each path manually and choose **Done** when finished. Cancelling or choosing **Done** without selecting a file produces no prompt.
+The **Fix Markdown** prompt directs math-render repairs for each selected file. The **Scientific Copy Editor** prompt directs technical and scientific writing edits under `Markdown_Rules.md`, requests a backup before editing, and flags unsupported claims and inconsistencies while preserving math and document structure.
 
 The Git menu can create commit, push, branch, and file operation prompts. It generates prompt text; it does not execute Git commands itself. File remove, rename, and move actions collect paths and generate a prompt for an AI assistant.
 

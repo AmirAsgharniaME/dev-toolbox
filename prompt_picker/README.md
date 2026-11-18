@@ -51,9 +51,9 @@ Choose **Create/update project file list** from the main menu to copy a prompt f
 
 ## Using the picker
 
-Select a file from the Rofi menu. Choose **Add File Path** to collect more paths, then choose **Done** to print, copy, and paste the selected paths joined by `And`. You can also choose an action to generate a prompt for the selected file or files. Available actions include:
+Select a file from the Rofi menu. Choose **Add File Path** to collect more paths, then choose **Done** to print, copy, and paste a sentence describing each selection, joined by `And`. Each inventory entry includes its label and path; raw entries are included as written. For example: ``Selected files: Prompt Picker file in the path: `prompt_picker/prompt_picker.sh`.`` You can also choose an action to generate a prompt for the selected file or files. Available actions include:
 
-- Choose **None (Just Paste File Path)** to print, copy, and paste the selected path or collected paths joined by `And`
+- Choose **None (Just Paste File Path)** to print, copy, and paste the same description for the current selection
 - Open the Git prompts menu
 - Open the main project prompts menu, including the AGENTS.md and file list prompts, the priority-3 Create STATE.md prompt, AGENT_REPORT.md and TASK_PLAN.md prompts, Exec-Task, the Update STATE.md prompt, Fix Markdown, Scientific Copy Editor, Fix Compiler / Syntax Issues, Fix Logic / CFD Implementation, Refactor, Rewrite from Scratch, Sync / Adapt with another file, and all three staged C++ performance prompt pipelines
 

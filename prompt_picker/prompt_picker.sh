@@ -117,7 +117,6 @@ PROJECT_PIPELINE_ACTION="15. ApexFVM: The 5-Stage C++ Performance Pipeline for P
 CLASS_PIPELINE_ACTION="16. The 3-Stage C++ Performance Pipeline for Class"
 FUNCTION_PIPELINE_ACTION="17. The 3-Stage C++ Performance Pipeline for Function"
 TARGET_DESC=""
-SELECTED_PATHS=""
 SELECTED_COUNT=0
 CHOSEN_ACTION=""
 PIPELINE_SELECTED=0
@@ -1088,17 +1087,10 @@ while [[ -z "$CHOSEN_ACTION" ]]; do
     fi
 
     CURRENT_DESC=$(describe_menu_line "$SELECTED_LINE")
-    parse_menu_line "$SELECTED_LINE" TARGET_TYPE TARGET_LABEL TARGET_PATH
-
     if [[ -n "$TARGET_DESC" ]]; then
         TARGET_DESC+=" And $CURRENT_DESC"
     else
         TARGET_DESC="$CURRENT_DESC"
-    fi
-    if [[ -n "$SELECTED_PATHS" ]]; then
-        SELECTED_PATHS+=" And $TARGET_PATH"
-    else
-        SELECTED_PATHS="$TARGET_PATH"
     fi
     ((SELECTED_COUNT += 1))
 
@@ -1350,7 +1342,7 @@ PROMPT
         esac
         ;;
     "1. None (Just Paste File Path)"|"3. Done")
-        FINAL_PROMPT="$SELECTED_PATHS"
+        FINAL_PROMPT="Selected files: $TARGET_DESC."
         ;;
     *)
         exit 1

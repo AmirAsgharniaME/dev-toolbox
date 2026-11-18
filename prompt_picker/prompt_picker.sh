@@ -665,10 +665,23 @@ show_git_prompts_menu() {
     esac
 }
 
+report_prompt_error() {
+    local message="$1"
+    printf 'Prompt Picker error: %s\n' "$message" >&2
+    if command -v notify-send >/dev/null 2>&1; then
+        notify-send "Prompt Picker error" "$message" -i dialog-error 2>/dev/null || true
+    fi
+}
+
 copy_and_paste_prompt() {
     local prompt="$1"
     local window_class="" paste_key="shift+Insert" clipboard_tool clipboard_text
     local primary_ok=0 focused_win=""
+
+    if [[ -z "$prompt" ]]; then
+        report_prompt_error "Generated prompt is empty; nothing was copied or pasted."
+        return 1
+    fi
 
     # Keep final execution separate from navigating between stages.
     local confirmation
@@ -683,7 +696,7 @@ copy_and_paste_prompt() {
     if command -v xclip >/dev/null 2>&1; then
         clipboard_tool=xclip
         if ! printf '%s' "$prompt" | xclip -selection clipboard 2>/dev/null; then
-            notify-send "Error" "Could not copy the prompt to the clipboard." -i dialog-error
+            report_prompt_error "Could not copy the prompt to the clipboard."
             return 1
         fi
         # Shift+Insert uses PRIMARY in VTE terminals and CLIPBOARD in others.
@@ -693,14 +706,14 @@ copy_and_paste_prompt() {
     elif command -v xsel >/dev/null 2>&1; then
         clipboard_tool=xsel
         if ! printf '%s' "$prompt" | xsel --clipboard --input; then
-            notify-send "Error" "Could not copy the prompt to the clipboard." -i dialog-error
+            report_prompt_error "Could not copy the prompt to the clipboard."
             return 1
         fi
         if printf '%s' "$prompt" | xsel --primary --input; then
             primary_ok=1
         fi
     else
-        notify-send "Error" "Could not copy the prompt to the clipboard." -i dialog-error
+        report_prompt_error "No clipboard utility is available; the prompt was printed above."
         return 1
     fi
 
@@ -739,7 +752,7 @@ copy_and_paste_prompt() {
         esac
 
         if [[ "${paste_key,,}" == "shift+insert" ]] && ((primary_ok == 0)); then
-            notify-send "Error" "Could not copy the prompt to PRIMARY; automatic paste was skipped." -i dialog-error
+            report_prompt_error "Could not copy the prompt to PRIMARY; automatic paste was skipped."
             return 1
         fi
 
@@ -749,7 +762,7 @@ copy_and_paste_prompt() {
             clipboard_text=$(xsel --clipboard --output 2>/dev/null || true)
         fi
         if [[ -z "$prompt" || -z "$clipboard_text" ]]; then
-            notify-send "Error" "The prompt is not available on the clipboard." -i dialog-error
+            report_prompt_error "The prompt is not available on the clipboard."
             return 1
         fi
         # Activate synchronously so the paste key cannot land in the picker.

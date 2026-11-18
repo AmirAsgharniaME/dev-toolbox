@@ -23,7 +23,9 @@ class PickerGuiTests(unittest.TestCase):
         for name in ('alpha', 'beta'):
             project = self.root / name
             project.mkdir()
-            (project / 'FILEPATH.md').write_text(f'MD | {name.title()} Entry | {name}.md\n')
+            (project / 'FILEPATH.md').write_text(
+                f'MD | {name.title()} Entry | {name}.md\n'
+                f'PY | {name.title()} Script | {name}.py\n')
             self.children.append(subprocess.Popen(['sleep', '60'], cwd=project))
         bindir = self.root / 'bin'
         bindir.mkdir()
@@ -124,6 +126,32 @@ class PickerGuiTests(unittest.TestCase):
         self.keys('Escape')
         output, _ = self.app.communicate(timeout=5)
         self.assertEqual(output, '')
+
+    def test_multi_file_done_is_keyboard_reachable_and_activatable(self):
+        self.keys('Left', 'Down', 'Up', 'Right')
+        self.wait_menu('MENU 1 Select File or Action:', 1)
+        self.type_text('Main Project Prompts')
+        self.keys('Return')
+        self.wait_menu('MENU 2 Main Project Prompts:', 1)
+        self.type_text('Fix Markdown')
+        self.keys('Return')
+        self.wait_menu('MENU 3 Select target file or Done:', 1)
+
+        # The list must own focus immediately: move down before any click or Tab,
+        # toggle that row, then use Tab and Space to activate Done.
+        self.keys('Down', 'Return', 'Tab', 'Tab', 'Tab', 'Tab', 'Tab', 'space')
+        self.wait_menu('MENU 4 Generate prompt:', 1)
+        self.assertIsNone(self.app.poll(), 'group confirmation must not generate the prompt')
+
+        # Back restores the selected row and puts keyboard focus on the list.
+        self.keys('Left')
+        self.wait_menu('MENU 3 Select target file or Done:', 2)
+        self.keys('ctrl+Return')
+        self.wait_menu('MENU 4 Generate prompt:', 2)
+        self.keys('Return')
+        output, _ = self.app.communicate(timeout=8)
+        self.assertIn('alpha.py', output)
+        self.assertNotIn('alpha.md', output)
 
     def test_window_manager_close_cancels_without_output(self):
         if not shutil.which('wmctrl'):

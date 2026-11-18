@@ -96,6 +96,12 @@ class MultiSelection:
     def values(self):
         return [item for index, item in enumerate(self.items) if index in self.selected]
 
+    def panel_items(self):
+        return self.values()
+
+    def panel_empty_message(self):
+        return 'No files selected' if not self.selected else ''
+
     def display(self, index):
         marker = '✓  ' if index in self.selected else '□  '
         return marker + self.items[index]
@@ -107,6 +113,31 @@ class MultiSelection:
         if self.maximum is not None and count > self.maximum:
             return f"Select no more than {self.maximum} file{'s' if self.maximum != 1 else ''}."
         return None
+
+
+def multi_key_action(key, list_focused, done_focused):
+    """Return the multi-select action for a key and its current focus target."""
+    if list_focused and key in ('Ctrl+Return', 'Ctrl+KP_Enter'):
+        return 'confirm'
+    if done_focused and key in ('Return', 'KP_Enter', 'space'):
+        return 'confirm'
+    if list_focused and key in ('Return', 'KP_Enter'):
+        return 'toggle'
+    return None
+
+
+def preferred_multi_index(selected):
+    """Choose a selected row as the initial highlight when restoring a group."""
+    return selected[0] if selected else None
+
+
+def menu_row_value(items, row_index, by_index=False, multi=False):
+    """Resolve a highlighted row safely when a menu's item list has changed."""
+    if row_index < 0 or row_index >= len(items):
+        return None
+    if multi:
+        return row_index
+    return str(row_index) if by_index else items[row_index]
 
 
 def run_window(script):
@@ -159,7 +190,26 @@ def run_window(script):
             self.view.connect('row-activated', self.row_activated)
             scroller = Gtk.ScrolledWindow()
             scroller.add(self.view)
-            box.pack_start(scroller, True, True, 0)
+            self.selection_panel = Gtk.Frame(label='Selected files')
+            self.selection_panel.set_size_request(200, -1)
+            self.selection_list = Gtk.ListBox()
+            self.selection_list.set_selection_mode(Gtk.SelectionMode.NONE)
+            self.selection_list.set_can_focus(False)
+            selection_scroller = Gtk.ScrolledWindow()
+            selection_scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+            selection_scroller.add(self.selection_list)
+            self.selection_empty = Gtk.Label(label='No files selected', xalign=0)
+            self.selection_empty.set_line_wrap(True)
+            selection_content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+            selection_content.pack_start(self.selection_empty, False, False, 6)
+            selection_content.pack_start(selection_scroller, True, True, 0)
+            self.selection_panel.add(selection_content)
+            self.selection_empty.hide()
+            self.main_pane = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
+            self.main_pane.pack1(scroller, True, True)
+            self.main_pane.pack2(self.selection_panel, False, False)
+            self.main_pane.set_position(560)
+            box.pack_start(self.main_pane, True, True, 0)
             buttons = Gtk.ButtonBox()
             buttons.set_layout(Gtk.ButtonBoxStyle.END)
             self.back_button = Gtk.Button(label='Back')
@@ -171,6 +221,8 @@ def run_window(script):
             self.toggle_button = Gtk.Button(label='Toggle file')
             self.toggle_button.connect('clicked', lambda *_: self.toggle_current())
             self.done_button = Gtk.Button(label='Select')
+            self.done_button.set_can_focus(True)
+            self.done_button.set_can_default(True)
             self.done_button.connect('clicked', lambda *_: self.accept())
             for button in (self.back_button, self.forward_button, cancel,
                            self.toggle_button, self.done_button):
@@ -178,6 +230,7 @@ def run_window(script):
             box.pack_start(buttons, False, False, 0)
             threading.Thread(target=self.serve, daemon=True).start()
             self.show_all()
+            self.selection_panel.hide()
             self.entry.grab_focus()
             self.start_worker(0)
 
@@ -271,24 +324,40 @@ def run_window(script):
             self.custom = '-no-custom' not in args
             self.fuzzy = '-matching' in args and args[args.index('-matching') + 1] == 'fuzzy'
             self.label.set_text(self.title)
+            if self.multi:
+                self.resize(900, max(500, self.get_size()[1]))
             if self.final_summary:
                 self.selection_label.set_text('Selections: ' + self.final_summary)
             prior_value = previous['value']
             self.multi_selection = MultiSelection(request['items'], prior_value or []) if self.multi else None
+            if self.multi:
+                self.selection_panel.show_all()
+            else:
+                self.selection_panel.hide()
+            # The previous stage's TreeView rows belong to a different request.
+            # Clear them before any filter-change callback can inspect their row
+            # indices against this request's (possibly much shorter) item list.
+            self.model.clear()
             custom_value = prior_value if self.custom and prior_value not in request['items'] else ''
             self.entry.set_text('' if self.multi else (custom_value or ''))
             self.populate(prior_value)
             self.update_selection_summary()
             self.update_buttons()
-            self.entry.grab_focus()
+            if self.multi:
+                self.view.grab_focus()
+            else:
+                self.entry.grab_focus()
             return False
 
         def populate(self, preferred=None):
+            if self.multi and isinstance(preferred, list):
+                preferred = preferred_multi_index(preferred)
             if preferred is None:
                 model, row = self.view.get_selection().get_selected()
                 if row is not None:
-                    preferred = (str(model[row][1]) if self.by_index
-                                 else model[row][0])
+                    preferred = menu_row_value(
+                        self.request['items'], int(model[row][1]),
+                        by_index=self.by_index, multi=self.multi)
             text = self.entry.get_text().casefold()
             self.model.clear()
             match_row = None
@@ -298,7 +367,7 @@ def run_window(script):
                 display = self.multi_selection.display(index) if self.multi else item
                 row = self.model.append([display, index])
                 value = str(index) if self.by_index else item
-                if preferred == value:
+                if preferred == (index if self.multi else value):
                     match_row = row
             selection = self.view.get_selection()
             if match_row is not None:
@@ -324,8 +393,9 @@ def run_window(script):
             model, row = self.view.get_selection().get_selected()
             if row is None:
                 return
-            self.multi_selection.toggle(int(model[row][1]))
-            self.populate()
+            index = int(model[row][1])
+            self.multi_selection.toggle(index)
+            self.populate(index)
             self.update_selection_summary()
 
         def row_activated(self, _view, _path, _column):
@@ -343,15 +413,27 @@ def run_window(script):
                 return
             values = self.multi_selection.values()
             prefix = (self.group_info + ' — ') if self.group_info else ''
-            summary = ', '.join(values) if values else 'none'
-            if len(summary) > 180:
-                summary = summary[:177] + '…'
             error = self.multi_selection.validation_error()
             self.selection_label.set_text(
                 f'{prefix}Selected: {len(values)} file' + ('s' if len(values) != 1 else '') +
-                f' — {summary}' + (f' — {error}' if error else ''))
+                (f' — {error}' if error else ''))
+            self.update_selection_panel()
             self.done_button.set_label('Done')
             self.done_button.set_sensitive(error is None)
+
+        def update_selection_panel(self):
+            for child in self.selection_list.get_children():
+                self.selection_list.remove(child)
+            values = self.multi_selection.panel_items()
+            self.selection_empty.set_visible(not values)
+            for item in values:
+                label = Gtk.Label(label=item, xalign=0)
+                label.set_line_wrap(True)
+                label.set_max_width_chars(28)
+                row = Gtk.ListBoxRow()
+                row.add(label)
+                self.selection_list.add(row)
+                row.show_all()
 
         def accept(self):
             if not self.pending:
@@ -391,6 +473,15 @@ def run_window(script):
             self.forward_button.set_sensitive(self.current + 1 < len(self.history.steps))
 
         def key_pressed(self, _widget, event):
+            if (self.multi and self.view.has_focus() and
+                    event.state & Gdk.ModifierType.CONTROL_MASK and
+                    event.keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter)):
+                key = 'Ctrl+Return' if event.keyval == Gdk.KEY_Return else 'Ctrl+KP_Enter'
+                action = multi_key_action(
+                    key, self.view.has_focus(), self.done_button.has_focus())
+                if action == 'confirm':
+                    self.accept()
+                    return True
             if event.state & Gdk.ModifierType.CONTROL_MASK and self.entry.has_focus():
                 if event.keyval in (Gdk.KEY_b, Gdk.KEY_f):
                     offset = -1 if event.keyval == Gdk.KEY_b else 1
@@ -407,9 +498,21 @@ def run_window(script):
                 self.close_window(); return True
             if event.keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
                 if self.multi:
-                    self.toggle_current()
+                    action = multi_key_action(
+                        'Return' if event.keyval == Gdk.KEY_Return else 'KP_Enter',
+                        self.view.has_focus(), self.done_button.has_focus())
+                    if action == 'confirm':
+                        self.accept()
+                        return True
+                    if action == 'toggle':
+                        self.toggle_current()
+                        return True
+                    return False
                 else:
                     self.accept()
+                return True
+            if event.keyval == Gdk.KEY_space and self.multi and self.done_button.has_focus():
+                self.accept()
                 return True
             if event.keyval in (Gdk.KEY_Up, Gdk.KEY_Down):
                 model, row = self.view.get_selection().get_selected()

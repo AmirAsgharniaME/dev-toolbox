@@ -1,5 +1,12 @@
 import importlib.util
+import json
+import os
 from pathlib import Path
+import shutil
+import socket
+import subprocess
+import tempfile
+import threading
 import unittest
 
 path = Path(__file__).resolve().parents[1] / 'prompt_picker' / 'picker_ui.py'
@@ -96,6 +103,35 @@ class PickerHistoryTests(unittest.TestCase):
         self.assertEqual(selection.visible('beta'), [(1, 'beta.md')])
         self.assertEqual(selection.values(), ['alpha.md'])
 
+    def test_panel_updates_immediately_on_select_and_deselect(self):
+        selection = picker.MultiSelection(['a.md', 'b.md'])
+        self.assertEqual(selection.panel_empty_message(), 'No files selected')
+        selection.toggle(0)
+        self.assertEqual(selection.panel_items(), ['a.md'])
+        self.assertEqual(selection.panel_empty_message(), '')
+        selection.toggle(0)
+        self.assertEqual(selection.panel_items(), [])
+        self.assertEqual(selection.panel_empty_message(), 'No files selected')
+
+    def test_panel_lists_multiple_files_and_keeps_filtered_files(self):
+        selection = picker.MultiSelection(['/project/alpha file.md', '/project/beta.md'])
+        selection.toggle(0)
+        selection.toggle(1)
+        self.assertEqual(selection.panel_items(),
+                         ['/project/alpha file.md', '/project/beta.md'])
+        self.assertEqual(selection.visible('beta'), [(1, '/project/beta.md')])
+        self.assertEqual(selection.panel_items(),
+                         ['/project/alpha file.md', '/project/beta.md'])
+
+    def test_empty_filter_and_empty_inventory_have_safe_panel_state(self):
+        selection = picker.MultiSelection(['alpha.md'])
+        self.assertEqual(selection.visible('missing'), [])
+        self.assertEqual(selection.panel_empty_message(), 'No files selected')
+        empty = picker.MultiSelection([])
+        self.assertEqual(empty.visible(), [])
+        self.assertEqual(empty.panel_items(), [])
+        self.assertEqual(empty.panel_empty_message(), 'No files selected')
+
     def test_group_commit_advances_and_keeps_groups_separate(self):
         history = picker.History()
         group1 = request('a.md', 'b.md')
@@ -105,6 +141,10 @@ class PickerHistoryTests(unittest.TestCase):
         history.choose(1, group2, [1])
         self.assertEqual(history.steps[0]['value'], [0])
         self.assertEqual(history.steps[1]['value'], [1])
+        group1_panel = picker.MultiSelection(group1['items'], history.steps[0]['value'])
+        group2_panel = picker.MultiSelection(group2['items'], history.steps[1]['value'])
+        self.assertEqual(group1_panel.panel_items(), ['a.md'])
+        self.assertEqual(group2_panel.panel_items(), ['b.md'])
 
     def test_back_navigation_restores_group_selection(self):
         history = picker.History()
@@ -113,6 +153,7 @@ class PickerHistoryTests(unittest.TestCase):
         restored = picker.MultiSelection(['a.md', 'b.md'],
                                          history.prepare(0, request('a.md', 'b.md'))['value'])
         self.assertEqual(restored.values(), ['a.md'])
+        self.assertEqual(restored.panel_items(), ['a.md'])
         self.assertEqual(picker.menu_reply_value(request('a.md', 'b.md'), [0]), 'a.md')
 
     def test_final_group_values_remain_available_for_summary(self):
@@ -127,6 +168,25 @@ class PickerHistoryTests(unittest.TestCase):
         self.assertIsNone(selection.validation_error())
         selection.toggle(1)
         self.assertEqual(selection.validation_error(), 'Select no more than 1 file.')
+        self.assertEqual(selection.values(), ['a', 'b'])
+
+    def test_keyboard_focus_actions_are_explicit(self):
+        self.assertEqual(picker.multi_key_action('Return', True, False), 'toggle')
+        self.assertEqual(picker.multi_key_action('Return', False, True), 'confirm')
+        self.assertEqual(picker.multi_key_action('space', False, True), 'confirm')
+        self.assertEqual(picker.multi_key_action('Ctrl+Return', True, False), 'confirm')
+        self.assertIsNone(picker.multi_key_action('Ctrl+Return', False, False))
+        self.assertIsNone(picker.multi_key_action('Return', False, False))
+        self.assertIsNone(picker.multi_key_action('space', True, False))
+        self.assertEqual(picker.preferred_multi_index([1, 2]), 1)
+        self.assertIsNone(picker.preferred_multi_index([]))
+
+    def test_stale_highlight_index_is_safe_after_menu_transition(self):
+        self.assertIsNone(picker.menu_row_value(['Generate prompt'], 2))
+        self.assertEqual(picker.menu_row_value(['Generate prompt'], 0),
+                         'Generate prompt')
+        self.assertEqual(picker.menu_row_value(['first', 'second'], 1,
+                                               by_index=True), '1')
 
     def test_ordinary_single_choice_and_no_selection_menu_contracts(self):
         history = picker.History()
@@ -134,6 +194,136 @@ class PickerHistoryTests(unittest.TestCase):
         self.assertEqual(history.steps[0]['value'], 'only')
         self.assertEqual(picker.MultiSelection(['a']).validation_error(),
                          'Select at least 1 file.')
+
+
+class PromptOutputTests(unittest.TestCase):
+    script = Path(__file__).resolve().parents[1] / 'prompt_picker' / 'prompt_picker.sh'
+    inventory = ('MD | Readme | README.md\n'
+                 'PY | Picker UI | prompt_picker/picker_ui.py\n'
+                 'SH | Picker Script | prompt_picker/prompt_picker.sh\n')
+
+    @classmethod
+    def setUpClass(cls):
+        try:
+            with tempfile.TemporaryDirectory(prefix='picker-socket-check-') as tmp:
+                probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                try:
+                    probe.bind(str(Path(tmp) / 'probe.sock'))
+                finally:
+                    probe.close()
+        except OSError as error:
+            raise unittest.SkipTest(f'local Unix sockets are unavailable: {error}')
+
+    def run_prompt(self, action, groups=(), with_inventory=True,
+                   clipboard_fails=False, expected_return=0, expected_error=None):
+        with tempfile.TemporaryDirectory(prefix='picker-output-test-') as tmp:
+            root = Path(tmp)
+            if with_inventory:
+                (root / 'FILEPATH.md').write_text(self.inventory)
+            script_copy = root / 'prompt_picker.sh'
+            shutil.copyfile(self.script, script_copy)
+            shutil.copyfile(self.script.with_name('picker_ui.py'), root / 'picker_ui.py')
+            bindir = root / 'bin'
+            bindir.mkdir()
+            clipboard = bindir / 'xclip'
+            clipboard.write_text('#!/bin/sh\n' +
+                                 ('exit 1\n' if clipboard_fails else 'cat >/dev/null\n'))
+            clipboard.chmod(0o755)
+            server_path = str(root / 'menu.sock')
+            server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            server.bind(server_path)
+            server.listen(1)
+            server.settimeout(.2)
+            stop = threading.Event()
+            seen = []
+            server_errors = []
+
+            def serve():
+                group_number = 0
+                while not stop.is_set():
+                    try:
+                        connection, _ = server.accept()
+                    except socket.timeout:
+                        continue
+                    except OSError:
+                        return
+                    with connection:
+                        request = json.loads(connection.makefile('rb').readline())
+                        seen.append(request)
+                        args = request['arguments']
+                        title = args[args.index('-p') + 1] if '-p' in args else ''
+                        if title == 'No file list found:':
+                            answer = '2. Main Project Prompts'
+                        elif title == 'Select File or Action:':
+                            answer = '2. Main Project Prompts'
+                        elif title == 'Main Project Prompts:':
+                            answer = action
+                        elif title.startswith('Select target file or Done:'):
+                            answer = '\n'.join(groups[group_number])
+                            group_number += 1
+                        elif title.startswith('Select source file or Done:'):
+                            answer = '\n'.join(groups[group_number])
+                            group_number += 1
+                        elif title == 'Generate prompt:':
+                            answer = 'Generate prompt'
+                        else:
+                            server_errors.append(f'Unexpected menu: {title}')
+                            answer = ''
+                        connection.sendall((json.dumps({'value': answer}) + '\n').encode())
+                        if title == 'Generate prompt:':
+                            return
+
+            thread = threading.Thread(target=serve, daemon=True)
+            thread.start()
+            environment = os.environ.copy()
+            environment.update(PICKER_WORKER='1', PICKER_ACTIVE_WIN='', PICKER_SOCKET=server_path,
+                               PICKER_GENERATION='output-test', PATH=str(bindir) + ':' + environment['PATH'])
+            process = None
+            try:
+                process = subprocess.run(['bash', str(script_copy)], cwd=root, env=environment,
+                                         capture_output=True, text=True, timeout=10)
+            finally:
+                stop.set()
+                server.close()
+                thread.join(timeout=1)
+            self.assertFalse(server_errors, server_errors)
+            self.assertIsNotNone(process)
+            self.assertEqual(process.returncode, expected_return, process.stderr)
+            self.assertTrue(process.stdout.strip(), 'prompt output must be non-empty')
+            if expected_error:
+                self.assertIn(expected_error, process.stderr)
+            self.assertEqual(seen[-1]['arguments'][seen[-1]['arguments'].index('-p') + 1],
+                             'Generate prompt:')
+            return process.stdout
+
+    def test_no_file_prompt_is_printed(self):
+        output = self.run_prompt('3. Create STATE.md', with_inventory=False)
+        self.assertIn('STATE.md', output)
+        self.assertIn('current status', output)
+
+    def test_single_file_prompt_contains_selected_path(self):
+        output = self.run_prompt('8. Fix Markdown', groups=[['MD | Readme | README.md']])
+        self.assertIn('TARGET FILE PATHS: README.md', output)
+
+    def test_multi_file_one_group_contains_all_selected_paths(self):
+        output = self.run_prompt('18. Backup File', groups=[[
+            'MD | Readme | README.md', 'PY | Picker UI | prompt_picker/picker_ui.py']])
+        self.assertIn('Target file:\nREADME.md', output)
+        self.assertIn('Target file:\nprompt_picker/picker_ui.py', output)
+
+    def test_multi_file_multiple_groups_keep_target_and_source_separate(self):
+        output = self.run_prompt('14. Sync / Adapt with another file...', groups=[
+            ['MD | Readme | README.md', 'PY | Picker UI | prompt_picker/picker_ui.py'],
+            ['SH | Picker Script | prompt_picker/prompt_picker.sh']])
+        self.assertIn('sync README.md And prompt_picker/picker_ui.py', output)
+        self.assertIn('based on the interface and changes introduced in prompt_picker/prompt_picker.sh',
+                      output)
+
+    def test_clipboard_failure_still_prints_prompt_and_reports_error(self):
+        output = self.run_prompt('3. Create STATE.md', with_inventory=False,
+                                 clipboard_fails=True, expected_return=1,
+                                 expected_error='Could not copy the prompt to the clipboard.')
+        self.assertIn('STATE.md', output)
 
 
 if __name__ == '__main__':

@@ -97,6 +97,16 @@ class PickerHistoryTests(unittest.TestCase):
         self.assertEqual(selection.values(), [])
         self.assertTrue(selection.display(1).startswith('□'))
 
+    def test_last_selected_row_tracks_selection_order(self):
+        selection = picker.MultiSelection(['a', 'b', 'c'])
+        selection.toggle(0)
+        selection.toggle(2)
+        self.assertEqual(selection.last_selected, 2)
+        self.assertTrue(picker.multi_right_moves_to_done(2, selection.last_selected))
+        self.assertFalse(picker.multi_right_moves_to_done(0, selection.last_selected))
+        selection.toggle(2)
+        self.assertEqual(selection.last_selected, 0)
+
     def test_selected_rows_survive_filtering(self):
         selection = picker.MultiSelection(['alpha.md', 'beta.md', 'gamma.md'])
         selection.toggle(0)
@@ -178,8 +188,14 @@ class PickerHistoryTests(unittest.TestCase):
         self.assertIsNone(picker.multi_key_action('Ctrl+Return', False, False))
         self.assertIsNone(picker.multi_key_action('Return', False, False))
         self.assertIsNone(picker.multi_key_action('space', True, False))
-        self.assertEqual(picker.preferred_multi_index([1, 2]), 1)
+        self.assertEqual(picker.preferred_multi_index([1, 2]), 2)
         self.assertIsNone(picker.preferred_multi_index([]))
+
+    def test_right_only_moves_to_done_from_last_visible_row(self):
+        self.assertFalse(picker.multi_right_moves_to_done(1, 2))
+        self.assertTrue(picker.multi_right_moves_to_done(2, 2))
+        self.assertTrue(picker.multi_right_moves_to_done(0, 0))
+        self.assertFalse(picker.multi_right_moves_to_done(None, None))
 
     def test_stale_highlight_index_is_safe_after_menu_transition(self):
         self.assertIsNone(picker.menu_row_value(['Generate prompt'], 2))

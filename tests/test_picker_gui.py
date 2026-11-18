@@ -137,9 +137,11 @@ class PickerGuiTests(unittest.TestCase):
         self.keys('Return')
         self.wait_menu('MENU 3 Select target file or Done:', 1)
 
-        # The list must own focus immediately: move down before any click or Tab,
-        # toggle that row, then use Tab and Space to activate Done.
-        self.keys('Down', 'Return', 'Tab', 'Tab', 'Tab', 'Tab', 'Tab', 'space')
+        # Select the last visible row, then use the physical Right Arrow to
+        # reveal/focus Done. Right alone must not commit the group.
+        self.keys('Down', 'Return', 'Right')
+        self.assertIsNone(self.app.poll(), 'Right must not commit the group')
+        self.keys('Return')
         self.wait_menu('MENU 4 Generate prompt:', 1)
         self.assertIsNone(self.app.poll(), 'group confirmation must not generate the prompt')
 

@@ -79,15 +79,20 @@ class MultiSelection:
     """A stable selection of original menu rows, independent of filtering."""
     def __init__(self, items, selected=None, minimum=1, maximum=None):
         self.items = list(items)
-        self.selected = set(selected or [])
+        selected = list(selected or [])
+        self.selected = set(selected)
+        self.last_selected = selected[-1] if selected else None
         self.minimum = minimum
         self.maximum = maximum
 
     def toggle(self, index):
         if index in self.selected:
             self.selected.remove(index)
+            if index == self.last_selected:
+                self.last_selected = max(self.selected) if self.selected else None
         else:
             self.selected.add(index)
+            self.last_selected = index
 
     def visible(self, text='', fuzzy=False):
         return [(index, item) for index, item in enumerate(self.items)
@@ -126,9 +131,14 @@ def multi_key_action(key, list_focused, done_focused):
     return None
 
 
+def multi_right_moves_to_done(highlighted_item, last_selected):
+    """Whether Right is on the row for the most recently selected file."""
+    return highlighted_item is not None and highlighted_item == last_selected
+
+
 def preferred_multi_index(selected):
     """Choose a selected row as the initial highlight when restoring a group."""
-    return selected[0] if selected else None
+    return selected[-1] if selected else None
 
 
 def menu_row_value(items, row_index, by_index=False, multi=False):
@@ -159,6 +169,7 @@ def run_window(script):
             self.target = 0
             self.generation = 0
             self.pending = None
+            self.multi_done_revealed = False
             self.process = None
             self.closing = False
             self.tempdir = tempfile.TemporaryDirectory(prefix='prompt-picker-')
@@ -345,6 +356,7 @@ def run_window(script):
             self.update_buttons()
             if self.multi:
                 self.view.grab_focus()
+                self.multi_done_revealed = False
             else:
                 self.entry.grab_focus()
             return False
@@ -419,7 +431,9 @@ def run_window(script):
                 (f' — {error}' if error else ''))
             self.update_selection_panel()
             self.done_button.set_label('Done')
-            self.done_button.set_sensitive(error is None)
+            # Keep Done focusable even when the count is invalid so Enter can
+            # produce the validation message without leaving this stage.
+            self.done_button.set_sensitive(True)
 
         def update_selection_panel(self):
             for child in self.selection_list.get_children():
@@ -490,9 +504,25 @@ def run_window(script):
                     return True
             if event.state & (Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.MOD1_MASK):
                 return False
+            if self.multi and self.done_button.has_focus():
+                if event.keyval == Gdk.KEY_Left:
+                    self.view.grab_focus()
+                    return True
+                if event.keyval == Gdk.KEY_Right:
+                    return True
             if event.keyval == Gdk.KEY_Left:
                 self.back(); return True
             if event.keyval == Gdk.KEY_Right:
+                if self.multi and self.view.has_focus():
+                    model, row = self.view.get_selection().get_selected()
+                    position = model.get_path(row).get_indices()[0] if row else None
+                    highlighted_item = int(model[row][1]) if row else None
+                    if multi_right_moves_to_done(
+                            highlighted_item, self.multi_selection.last_selected):
+                        self.multi_done_revealed = True
+                        self.done_button.show()
+                        self.done_button.grab_focus()
+                        return True
                 self.forward(); return True
             if event.keyval == Gdk.KEY_Escape:
                 self.close_window(); return True

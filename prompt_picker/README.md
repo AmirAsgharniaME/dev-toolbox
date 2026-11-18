@@ -1,11 +1,11 @@
 # Prompt Picker
 
-`prompt_picker.sh` is a Rofi based Bash utility that builds AI prompts from a project's file list, copies the result to the clipboard, and can paste it into the window that was active when the script started. It also provides project maintenance and Git prompt menus.
+`prompt_picker.sh` is a Bash utility with a GTK 3 window that builds AI prompts from a project's file list, copies the result to the clipboard, and can paste it into the window that was active when the script started. It also provides project maintenance and Git prompt menus.
 
 ## Requirements
 
 - Bash 4 or later
-- Rofi
+- Python 3 with PyGObject and GTK 3 (on Debian/Ubuntu: `python3-gi` and `gir1.2-gtk-3.0`)
 - `xdotool` for detecting and restoring the previously active window and sending the paste shortcut
 - One clipboard utility: `xclip` (preferred) or `xsel`
 - `xprop` to identify the active window's application for paste shortcut selection; if unavailable, the script tries `xdotool getwindowclassname`
@@ -22,13 +22,13 @@ chmod +x prompt_picker.sh
 ./prompt_picker.sh
 ```
 
-You can also run it with `bash prompt_picker.sh`. A desktop shortcut can launch the same script; the existing Cinnamon Super+F binding needs no change. If multiple inventories are found, choose the project from the Rofi menu before continuing.
+You can also run it with `bash prompt_picker.sh`. A desktop shortcut can launch the same script; the existing Cinnamon Super+F binding needs no change. If multiple inventories are found, choose the project in the picker before continuing.
 
 ## Project file list
 
 The picker checks its launch directory, the working directory of the active X11 window's process and every accessible descendant, and the directory containing the script. GNOME Terminal normally uses a shared server, so this can include projects from multiple open terminal sessions. It cannot determine which of those sessions is focused, and sessions outside the active window's process tree may not be discovered. Process working directories must be accessible and contain the inventory directly; parent directories are not searched.
 
-In each directory, `FILEPATH.md` takes precedence over the legacy names `file_path.md`, `file_path`, and `file_path.txt`. Resolved paths are deduplicated. When multiple inventories are found, Rofi shows the parent directory name and full inventory path; select one to use throughout that invocation. One inventory is selected automatically. Canceling the selection exits without generating a prompt. When none is found, the existing no-file menu offers Git and project prompts.
+In each directory, `FILEPATH.md` takes precedence over the legacy names `file_path.md`, `file_path`, and `file_path.txt`. Resolved paths are deduplicated. When multiple inventories are found, the picker shows the parent directory name and full inventory path; select one to use throughout that invocation. One inventory is selected automatically. Canceling the selection exits without generating a prompt. When none is found, the existing no-file menu offers Git and project prompts.
 
 The file list uses pipe separated records:
 
@@ -49,7 +49,11 @@ Choose **Create/update project file list** from the main menu to copy a prompt f
 
 ## Using the picker
 
-Select a file from the Rofi menu. Choose **Add File Path** to collect more paths, then choose **Done** to print, copy, and paste a sentence describing each selection, joined by `And`. Each inventory entry includes its label and path; raw entries are included as written. For example: ``Selected files: Prompt Picker file in the path: `prompt_picker/prompt_picker.sh`.`` You can also choose an action to generate a prompt for the selected file or files. Available actions include:
+The picker uses one decorated, movable window. Drag its title bar to move it, minimize it with the title-bar button, and restore it from the Cinnamon panel. Clicking outside leaves it open. Use the visible X, **Cancel**, or Escape to close the workflow without generating a prompt.
+
+Use Up and Down to change the highlighted item, type to filter, and press Enter or double-click to select. Left and **Back** return one stage; Right and **Forward** advance the highlighted choice. Earlier choices are restored where possible, and changing a choice clears its dependent later stages. To move the filter cursor, use Ctrl+B and Ctrl+F, Home and End, or the mouse; plain Left and Right navigate stages. An explicit **Generate prompt** confirmation is required before the picker copies or pastes a prompt. Right does not confirm that final action; press Enter or click **Select**.
+
+Select a file from the picker. Choose **Add File Path** to collect more paths, then choose **Done** to print, copy, and paste a sentence describing each selection, joined by `And`. Each inventory entry includes its label and path; raw entries are included as written. For example: ``Selected files: Prompt Picker file in the path: `prompt_picker/prompt_picker.sh`.`` You can also choose an action to generate a prompt for the selected file or files. Available actions include:
 
 - Choose **None (Just Paste File Path)** to print, copy, and paste the same description for the current selection
 - Open the Git prompts menu
@@ -67,9 +71,13 @@ The **Fix Markdown** prompt directs math-render repairs for each selected file. 
 
 The Git menu can create commit, push, branch, and file operation prompts. It generates prompt text; it does not execute Git commands itself. File remove, rename, and move actions collect paths and generate a prompt for an AI assistant.
 
+## Tests
+
+Run `python3 -m unittest discover -s tests` from the repository root for the non-GUI tests. To also run the X11 integration tests on a Cinnamon desktop, use `PICKER_GUI_TESTS=1 python3 -m unittest discover -s tests`. The GUI tests open and focus picker windows and send keyboard events; they also require `xdotool` and, for the close test, `wmctrl`.
+
 ## Clipboard and paste behavior
 
-The generated prompt is printed to standard output and copied to the clipboard. The script captures the active window before opening Rofi, then attempts to reactivate it and paste the prompt. It uses `Ctrl+V` for common editors and browsers, and `Shift+Insert` for terminals and other applications by default.
+The generated prompt is printed to standard output and copied to the clipboard. The script captures the active window before opening its window, then attempts to reactivate it and paste the prompt. It uses `Ctrl+V` for common editors and browsers, and `Shift+Insert` for terminals and other applications by default.
 
 Set `PROMPT_PICKER_PASTE_KEY` to override the paste shortcut for the active window, for example:
 

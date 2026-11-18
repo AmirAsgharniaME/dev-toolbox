@@ -22,5 +22,8 @@ SH | Prompt Helper | prompt_helper/prompt_helper.sh
 SH | Run Translator | translator/run_translator.sh
 
 # Python Script
+PY | Picker Ui | prompt_picker/picker_ui.py
+PY | Test Picker Ui | tests/test_picker_ui.py
+PY | Test Picker Gui | tests/test_picker_gui.py
 PY | Refine Prompt | prompt_helper/refine_prompt.py
 PY | Translator | translator/translator.py

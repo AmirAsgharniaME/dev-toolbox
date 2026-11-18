@@ -6,12 +6,12 @@ Layout: this file is organized around repository purpose, implemented utilities,
 
 - This repository contains three standalone Linux desktop utilities: Prompt Picker, Prompt Helper, and Translator.
 - Prompt Picker also includes C++/CFD prompt templates for other projects; this repository itself has no C++/CFD implementation.
-- There is no build system, automated test suite, example tree, or separate asset tree in the repository.
+- There is no build system, example tree, or separate asset tree. Focused picker tests are in `tests/`.
 - The root `README.md` summarizes the utilities; utility-specific setup and behavior are documented in each utility directory.
 
 ## Repository Structure
 
-- `prompt_picker/` contains the Rofi/Bash prompt generator and its README.
+- `prompt_picker/` contains the Bash prompt generator, GTK 3 window, and README.
 - `prompt_helper/` contains the Zenity launcher, Python prompt refiner, and README.
 - `translator/` contains the Bash launcher, Python text polisher, and README.
 - `FILEPATH.md` is the pipe-separated project file inventory used by Prompt Picker; keep it synchronized with project files.
@@ -32,19 +32,17 @@ Layout: this file is organized around repository purpose, implemented utilities,
 - Follow `AGENTS.md`: keep shell compatible with Bash 4+, quote expansions, use four-space indentation, and prefer small descriptive `snake_case` functions. Keep Python compatible with supported desktop Python 3 versions.
 - For project changes, review the root README and the README for each touched utility; keep documentation accurate alongside code or structure changes.
 - Update `FILEPATH.md` for added, removed, moved, renamed, or retyped project files. Use its `TYPE | LABEL | PATH` schema, existing section headers, exact repository-relative paths, and mechanical filename-to-title labels.
-- There is no automated test framework. `AGENTS.md` specifies Bash syntax checks for scripts and manual X11/Rofi exercise for interactive behavior changes.
+- `AGENTS.md` specifies the focused unittest command, Bash syntax checks, and X11/GTK exercise for interactive behavior changes.
 - Keep API keys private and out of version control. Both API clients prefer `GAPGPT_API_KEY` over their local key file.
 - Git history uses mostly Conventional Commit-shaped messages, while `AGENTS.md` asks for a short imperative summary; no binding commit convention is established in the repository.
 
 ## Current Git State
 
-- The checked-out branch is `main`, tracking `origin/main`; the working tree currently has uncommitted modifications to `AGENTS.md`, `STATE.md`, `prompt_picker/README.md`, and `prompt_picker/prompt_picker.sh`.
-- The repository has 17 commits from `bd2f52d` (`Initial commit`) through `bdfe3df` (`docs(repo): document project state`). Recent committed work added project-planning and state prompts to Prompt Picker and documented the project state. The current uncommitted Prompt Picker change adds a `Fix Markdown` main-project menu option that asks for a Markdown path and generates a math-render repair prompt; the related README documents it, and `AGENTS.md` now includes it in the project structure description.
-- Git history is the source of truth for changes.
+- Use `git status` and `git log` for the current branch, working tree, and history; these change independently of this document.
 
 ## Verification and Known Limitations
 
-- No build or automated test commands are configured.
+- No build command is configured; run `python3 -m unittest discover -s tests` for focused picker tests.
 - Use the syntax checks in `AGENTS.md` after changing the corresponding Bash launchers.
 - Prompt Helper and Translator contain absolute paths rooted at `/home/amir/Documents/dev-toolbox`; relocation requires updating those paths.
 - Interactive clipboard, window-focus, paste, and notification behavior depends on the documented desktop utilities and an X11 session.
@@ -58,3 +56,5 @@ Layout: this file is organized around repository purpose, implemented utilities,
 
 - 2026-11-15: Created this repository-grounded status reference and added `STATE.md` to the project inventory. Recorded current utility behavior, governing workflow rules, verified Git baseline, and documentation questions.
 - 2026-11-15: Updated the state for the new Prompt Picker Fix Markdown prompt, current 17-commit Git history and dirty working tree; recorded the `AGENTS.md` history correction, removed its resolved open question, and retained the unverified translator documentation and process-discovery questions.
+
+- 2026-11-18: Added a GTK picker window with navigable menu history and focused tests; updated inventory and desktop documentation.

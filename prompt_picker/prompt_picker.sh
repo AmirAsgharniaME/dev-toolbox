@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# File Path Picker & AI Prompt Generator for Rofi
+# File Path Picker & AI Prompt Generator
 # Dynamic action selection (Syntax, Logic, Refactor, Rewrite, Sync, None)
 # Standalone use: chmod +x prompt_picker.sh && ./prompt_picker.sh
 
@@ -8,10 +8,21 @@ TARGET_FILE="FILEPATH.md"
 LEGACY_TARGET_FILES=("file_path.md" "file_path" "file_path.txt")
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
-# Capture the currently focused window before opening any menus.
-ACTIVE_WIN=$(xdotool getactivewindow 2>/dev/null || true)
+# Capture the target window once, before opening the persistent GTK window.
+if [[ -z "${PICKER_WORKER:-}" ]]; then
+    export PICKER_ACTIVE_WIN
+    PICKER_ACTIVE_WIN=$(xdotool getactivewindow 2>/dev/null || true)
+    exec python3 "$SCRIPT_DIR/picker_ui.py" "${BASH_SOURCE[0]}"
+fi
+ACTIVE_WIN="${PICKER_ACTIVE_WIN:-}"
 
 FILE_PATH=""
+
+# Send each menu request to the persistent window. The UI replays earlier
+# answers when navigating backward, stopping before any prompt is generated.
+rofi() {
+    python3 "$SCRIPT_DIR/picker_ui.py" --menu "$@"
+}
 
 trim_input() {
     local value="$1"
@@ -77,7 +88,7 @@ find_target_in_dir "$SCRIPT_DIR"
 if ((${#INVENTORIES[@]} == 1)); then
     FILE_PATH="${INVENTORIES[0]}"
 elif ((${#INVENTORIES[@]} > 1)); then
-    # Rofi returns the original row index, including when the list is filtered.
+    # The menu returns the original row index, including when filtered.
     INVENTORY_INDEX=$(
         for inventory in "${INVENTORIES[@]}"; do
             printf '%s — %s\n' "$(basename -- "$(dirname -- "$inventory")")" "$inventory"
@@ -599,6 +610,11 @@ copy_and_paste_prompt() {
     local window_class="" paste_key="shift+Insert" clipboard_tool clipboard_text
     local primary_ok=0 focused_win=""
 
+    # Keep final execution separate from navigating between stages.
+    local confirmation
+    confirmation=$(printf '%s\n' "Generate prompt" | rofi -dmenu -i -no-custom -p "Generate prompt:" -matching normal) || return 1
+    [[ "$confirmation" == "Generate prompt" ]] || return 1
+
     # Always expose the generated prompt to callers and terminal users.
     printf '%s\n' "$prompt"
 
@@ -627,7 +643,7 @@ copy_and_paste_prompt() {
     fi
 
     if [[ -n "$ACTIVE_WIN" ]]; then
-        # Rofi exits before Cinnamon consistently restores the previous window.
+        # Let Cinnamon settle before restoring the target window.
         # Let focus settle before querying window metadata or sending keys.
         sleep 0.25
         # Older xdotool versions have no getwindowclassname command. Read the
@@ -674,7 +690,7 @@ copy_and_paste_prompt() {
             notify-send "Error" "The prompt is not available on the clipboard." -i dialog-error
             return 1
         fi
-        # Activate synchronously so the paste key cannot land in Rofi.
+        # Activate synchronously so the paste key cannot land in the picker.
         if ! xdotool windowactivate --sync "$ACTIVE_WIN" 2>/dev/null; then
             printf '%s\n' 'Could not focus the original window; the prompt is on the clipboard.' >&2
             return 1
@@ -934,7 +950,7 @@ show_rename_prompt() {
             current_desc="$target_path"
         fi
 
-        new_name=$(zenity --entry --title="Enter new name." --text="Enter the new name for $target_path:" 2>/dev/null) || exit 0
+        new_name=$(rofi -dmenu -p "Enter new name for $target_path:" </dev/null) || exit 0
         new_name=$(trim_input "$new_name")
         [[ -n "$new_name" ]] || exit 0
 
@@ -980,7 +996,7 @@ show_move_prompt() {
             current_desc="$target_path"
         fi
 
-        new_path=$(zenity --entry --title="Enter new path." --text="Enter the new path for $target_path:" 2>/dev/null) || exit 0
+        new_path=$(rofi -dmenu -p "Enter new path for $target_path:" </dev/null) || exit 0
         new_path=$(trim_input "$new_path")
         [[ -n "$new_path" ]] || exit 0
 
@@ -1006,15 +1022,6 @@ show_move_prompt() {
 }
 
 if [[ -z "$FILE_PATH" ]]; then
-    if command -v zenity >/dev/null 2>&1; then
-        zenity --info --title="No file list found" \
-            --text="Could not find FILEPATH.md (or a legacy file_path.md/file_path/file_path.txt) beside the script, in the current directory, or in the active window's process tree. Project and Git prompts remain available." \
-            2>/dev/null || true
-    elif command -v rofi >/dev/null 2>&1; then
-        rofi -e "No FILEPATH.md (or legacy file_path.md/file_path/file_path.txt) found. Project and Git prompts remain available." 2>/dev/null || true
-    elif command -v notify-send >/dev/null 2>&1; then
-        notify-send "No file list found" "Project and Git prompts remain available." -i dialog-information
-    fi
 
     # The no-list route follows the file-operation definitions so Git actions
     # can use their manual path-entry fallback.

@@ -20,13 +20,13 @@ bash prompt_helper/prompt_helper.sh
 bash translator/run_translator.sh
 ```
 
-Prompt Picker discovers inventories in its launch directory and the active window’s process tree. When it finds multiple inventories, choose one in Rofi; see its guide for discovery limits and shortcut details.
+Prompt Picker discovers inventories in its launch directory and the active window’s process tree. When it finds multiple inventories, choose one in a window that can be minimized and restored; see its guide for controls, discovery limits, and shortcut details.
 
 The desktop flows are designed for Linux with an X11 session. See each utility's README for its required packages, clipboard and paste behavior, and setup details.
 
 ## Setup notes
 
-- **Prompt Picker** needs Bash 4+, Rofi, and a clipboard tool (`xclip` or `xsel`). `xdotool` enables active-window detection and automatic paste. `xprop` and `notify-send` are optional.
+- **Prompt Picker** needs Bash 4+, Python 3 with PyGObject and GTK 3, and a clipboard tool (`xclip` or `xsel`). `xdotool` enables active-window detection and automatic paste. `xprop` and `notify-send` are optional.
 - **Prompt Helper** needs Zenity, Python 3 with `requests`, `xclip`, and `xdotool`. Set `GAPGPT_API_KEY` or save the key in `prompt_helper/.gapgpt_key`.
 - **Translator** needs Python 3 with `requests`, `xclip`, and `notify-send` for the launcher flow. Set `GAPGPT_API_KEY` or save the key in `translator/.api_translator`.
 
@@ -39,12 +39,13 @@ Keep API key files private and out of version control. Both Prompt Helper and Tr
 ## Repository layout
 
 ```text
-prompt_picker/   Rofi prompt picker and its guide
+prompt_picker/   GTK prompt picker and its guide
 prompt_helper/   Zenity prompt refiner and its guide
 translator/      Text translator and its guide
+tests/           Focused picker tests
 FILEPATH.md      Project file inventory
 AGENTS.md        Repository instructions
 STATE.md         Current repository status
 ```
 
-There is no build system or automated test suite. For repository guidance and Bash syntax-check commands, see [`AGENTS.md`](AGENTS.md).
+There is no build system. Run the focused picker tests with `python3 -m unittest discover -s tests`; for repository guidance and Bash syntax-check commands, see [`AGENTS.md`](AGENTS.md).

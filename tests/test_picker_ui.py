@@ -52,6 +52,33 @@ class PickerHistoryTests(unittest.TestCase):
         self.assertEqual([item for item in items if picker.matches_filter(item, 'BeTa')],
                          ['Beta FILE', 'beta other'])
 
+    def test_navigation_wraps_up_from_first_item(self):
+        self.assertEqual(picker.wrapped_index(0, 3, -1), 2)
+
+    def test_navigation_wraps_down_from_last_item(self):
+        self.assertEqual(picker.wrapped_index(2, 3, 1), 0)
+
+    def test_navigation_wraps_only_visible_filtered_items(self):
+        visible = [item for item in ['alpha', 'beta', 'echo', 'delta']
+                   if picker.matches_filter(item, 'a')]
+        self.assertEqual(visible, ['alpha', 'beta', 'delta'])
+        self.assertEqual(picker.wrapped_index(0, len(visible), -1), 2)
+        self.assertEqual(picker.wrapped_index(len(visible) - 1, len(visible), 1), 0)
+
+        filtered = [item for item in ['alpha', 'beta', 'gamma', 'delta']
+                    if picker.matches_filter(item, 'mm')]
+        self.assertEqual(filtered, ['gamma'])
+        self.assertEqual(picker.wrapped_index(0, len(filtered), -1), 0)
+
+    def test_empty_navigation_is_safe(self):
+        self.assertIsNone(picker.wrapped_index(0, 0, -1))
+        self.assertIsNone(picker.wrapped_index(0, 0, 1))
+
+    def test_navigation_is_shared_across_menu_stages(self):
+        for count in (2, 4):
+            self.assertEqual(picker.wrapped_index(0, count, -1), count - 1)
+            self.assertEqual(picker.wrapped_index(count - 1, count, 1), 0)
+
 
 if __name__ == '__main__':
     unittest.main()

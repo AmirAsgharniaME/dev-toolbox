@@ -59,6 +59,15 @@ def matches_filter(item, text, fuzzy=False):
     return True
 
 
+def wrapped_index(index, count, direction):
+    """Return the next visible-row index, wrapping within ``count`` rows."""
+    if count <= 0:
+        return None
+    if count == 1:
+        return 0
+    return (index + direction) % count
+
+
 def run_window(script):
     import gi
     gi.require_version('Gtk', '3.0')
@@ -221,6 +230,11 @@ def run_window(script):
             return False
 
         def populate(self, preferred=None):
+            if preferred is None:
+                model, row = self.view.get_selection().get_selected()
+                if row is not None:
+                    preferred = (str(model[row][1]) if self.by_index
+                                 else model[row][0])
             text = self.entry.get_text().casefold()
             self.model.clear()
             match_row = None
@@ -295,8 +309,8 @@ def run_window(script):
                 model, row = self.view.get_selection().get_selected()
                 if len(model):
                     index = model.get_path(row).get_indices()[0] if row else 0
-                    index += 1 if event.keyval == Gdk.KEY_Down else -1
-                    index = max(0, min(len(model) - 1, index))
+                    direction = 1 if event.keyval == Gdk.KEY_Down else -1
+                    index = wrapped_index(index, len(model), direction)
                     path = Gtk.TreePath.new_from_indices([index])
                     self.view.get_selection().select_path(path)
                     self.view.scroll_to_cell(path, None, False, 0, 0)

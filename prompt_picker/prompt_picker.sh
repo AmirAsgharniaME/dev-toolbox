@@ -974,50 +974,14 @@ describe_menu_line() {
 }
 
 show_remove_prompt() {
-    local selected_line current_desc target_desc="" target_path=""
-    local selected_type selected_label
-    local selected_count=0 next_action
+    local target_paths
 
-    while true; do
-        if [[ -n "$FILE_PATH" ]]; then
-            selected_line=$(
-                printf '%s\n' "$FILE_MENU_LIST" |
-                    rofi -dmenu -i -no-custom -p "Select file to remove:" -matching normal
-            ) || exit 0
-            [[ -n "$selected_line" ]] || exit 0
-
-            current_desc=$(describe_menu_line "$selected_line")
-            parse_menu_line "$selected_line" selected_type selected_label target_path
-        else
-            target_path=$(rofi -dmenu -p "Enter file path to remove:" </dev/null) || exit 0
-            target_path=$(trim_input "$target_path")
-            [[ -n "$target_path" ]] || exit 0
-            current_desc="$target_path"
-        fi
-
-        if [[ -n "$target_desc" ]]; then
-            target_desc+=" And $current_desc"
-        else
-            target_desc="$current_desc"
-        fi
-        ((selected_count += 1))
-
-        next_action=$(
-            printf '%s\n' "1. Add File" "2. Done" |
-                rofi -dmenu -i -no-custom -p "Select another file or finish:" -matching fuzzy
-        )
-
-        case "$next_action" in
-            "1. Add File") ;;
-            "2. Done") break ;;
-            *) exit 0 ;;
-        esac
-    done
-
-    if ((selected_count == 1)); then
-        REMOVE_MESSAGE="Safely remove '$target_path' file using \`git rm\` so Git properly stages the deletion, and verify with \`git status\`."
+    target_paths=$(select_prompt_target_files "remove") || return 0
+    SELECTION_SUMMARY="remove (Group 1 of 1): $target_paths"
+    if [[ "$target_paths" == *" And "* ]]; then
+        REMOVE_MESSAGE="Safely remove the following files using \`git rm\` so Git properly stages the deletions, and verify with \`git status\`: $target_paths."
     else
-        REMOVE_MESSAGE="Safely remove the following files using \`git rm\` so Git properly stages the deletions, and verify with \`git status\`: $target_desc."
+        REMOVE_MESSAGE="Safely remove '$target_paths' file using \`git rm\` so Git properly stages the deletion, and verify with \`git status\`."
     fi
 
     copy_and_paste_prompt "$REMOVE_MESSAGE"

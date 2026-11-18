@@ -212,6 +212,9 @@ def run_window(script):
             self.selection_empty = Gtk.Label(label='No files selected', xalign=0)
             self.selection_empty.set_line_wrap(True)
             selection_content = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+            self.done_action = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+            self.done_action.set_halign(Gtk.Align.END)
+            selection_content.pack_start(self.done_action, False, False, 0)
             selection_content.pack_start(self.selection_empty, False, False, 6)
             selection_content.pack_start(selection_scroller, True, True, 0)
             self.selection_panel.add(selection_content)
@@ -235,13 +238,15 @@ def run_window(script):
             self.done_button.set_can_focus(True)
             self.done_button.set_can_default(True)
             self.done_button.connect('clicked', lambda *_: self.accept())
+            self.done_action.pack_start(self.done_button, False, False, 0)
             for button in (self.back_button, self.forward_button, cancel,
-                           self.toggle_button, self.done_button):
+                           self.toggle_button):
                 buttons.add(button)
             box.pack_start(buttons, False, False, 0)
             threading.Thread(target=self.serve, daemon=True).start()
             self.show_all()
             self.selection_panel.hide()
+            self.done_button.hide()
             self.entry.grab_focus()
             self.start_worker(0)
 
@@ -357,6 +362,8 @@ def run_window(script):
             if self.multi:
                 self.view.grab_focus()
                 self.multi_done_revealed = False
+                self.done_button.hide()
+                self.done_action.hide()
             else:
                 self.entry.grab_focus()
             return False
@@ -521,6 +528,12 @@ def run_window(script):
                             highlighted_item, self.multi_selection.last_selected):
                         self.multi_done_revealed = True
                         self.done_button.show()
+                        self.done_action.show()
+                        self.main_pane.queue_resize()
+                        self.queue_resize()
+                        self.present()
+                        while Gtk.events_pending():
+                            Gtk.main_iteration_do(False)
                         self.done_button.grab_focus()
                         return True
                 self.forward(); return True

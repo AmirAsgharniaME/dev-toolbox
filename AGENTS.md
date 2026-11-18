@@ -15,7 +15,7 @@ cd prompt_picker
 bash prompt_picker.sh
 ```
 
-For direct execution, use `chmod +x prompt_picker.sh` once, then `./prompt_picker.sh`. It needs Bash 4+ and Rofi. `xdotool`, `xprop`, and either `xclip` or `xsel` provide full window and clipboard behavior; `notify-send` is optional. To check Bash syntax after editing, run `bash -n prompt_picker/prompt_picker.sh`.
+The picker collects inventories from its launch directory, the active window’s accessible process tree, and its script directory; it asks the user to choose when several are found. Sessions outside that process tree may not be discovered. For direct execution, use `chmod +x prompt_picker.sh` once, then `./prompt_picker.sh`. It needs Bash 4+ and Rofi. `xdotool`, `xprop`, and either `xclip` or `xsel` provide full window and clipboard behavior; `notify-send` is optional. To check Bash syntax after editing, run `bash -n prompt_picker/prompt_picker.sh`.
 
 Run the prompt helper with `bash prompt_helper/prompt_helper.sh`. It needs Zenity, Python 3 with the `requests` package, `xclip`, and `xdotool`. The refiner reads `GAPGPT_API_KEY` first; if it is unset or empty, it reads the key from `prompt_helper/.gapgpt_key`. Keep that local key file private and out of version control. Check its Bash syntax with `bash -n prompt_helper/prompt_helper.sh`.
 

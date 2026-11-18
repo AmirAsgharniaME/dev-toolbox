@@ -5,7 +5,7 @@
 # Standalone use: chmod +x prompt_picker.sh && ./prompt_picker.sh
 
 TARGET_FILE="FILEPATH.md"
-LEGACY_TARGET_FILES=("file_path" "file_path.txt")
+LEGACY_TARGET_FILES=("file_path.md" "file_path" "file_path.txt")
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
 # Capture the currently focused window before opening any menus.
@@ -20,51 +20,39 @@ trim_input() {
     printf '%s' "$value"
 }
 
+# Collect one preferred inventory per directory and deduplicate resolved paths.
+declare -a INVENTORIES=()
+declare -A SEEN_INVENTORIES=() VISITED_PIDS=()
+
 find_target_in_dir() {
-    local dir="$1"
+    local dir="$1" candidate resolved name
 
-    [[ -n "$dir" && -d "$dir" ]] || return 1
-
-    if [[ -f "$dir/$TARGET_FILE" ]]; then
-        FILE_PATH="$dir/$TARGET_FILE"
-        return 0
-    fi
-
-    local legacy_file
-    for legacy_file in "${LEGACY_TARGET_FILES[@]}"; do
-        if [[ -f "$dir/$legacy_file" ]]; then
-            FILE_PATH="$dir/$legacy_file"
+    [[ -n "$dir" && -d "$dir" ]] || return 0
+    for name in "$TARGET_FILE" "${LEGACY_TARGET_FILES[@]}"; do
+        candidate="$dir/$name"
+        if [[ -f "$candidate" ]]; then
+            resolved=$(readlink -f -- "$candidate" 2>/dev/null) || return 0
+            if [[ -z "${SEEN_INVENTORIES[$resolved]+x}" ]]; then
+                SEEN_INVENTORIES["$resolved"]=1
+                INVENTORIES+=("$resolved")
+            fi
             return 0
         fi
     done
-
-    return 1
 }
 
-declare -A VISITED_PIDS=()
-
-search_pid_tree_for_target() {
-    local pid="$1"
-    local cwd
-    local child
-    local children_file
+search_pid_tree_for_targets() {
+    local pid="$1" cwd child children_file
     local -a children=() child_batch=()
 
-    [[ "$pid" =~ ^[0-9]+$ ]] || return 1
-    [[ -d "/proc/$pid" ]] || return 1
-    [[ -z "${VISITED_PIDS[$pid]+x}" ]] || return 1
-
+    [[ "$pid" =~ ^[0-9]+$ && -d "/proc/$pid" ]] || return 0
+    [[ -z "${VISITED_PIDS[$pid]+x}" ]] || return 0
     VISITED_PIDS["$pid"]=1
 
     cwd=$(readlink -f "/proc/$pid/cwd" 2>/dev/null || true)
-    if find_target_in_dir "$cwd"; then
-        return 0
-    fi
+    find_target_in_dir "$cwd"
 
-    # Read the kernel's child list directly instead of scanning all processes.
-    # Fall back for systems where this procfs interface is unavailable.
     if [[ -r "/proc/$pid/task/$pid/children" ]]; then
-        # Worker threads can own child processes too.
         for children_file in /proc/"$pid"/task/*/children; do
             child_batch=()
             { read -r -a child_batch < "$children_file"; } 2>/dev/null || true
@@ -75,25 +63,29 @@ search_pid_tree_for_target() {
     fi
 
     for child in "${children[@]}"; do
-        if search_pid_tree_for_target "$child"; then
-            return 0
-        fi
+        search_pid_tree_for_targets "$child"
     done
-
-    return 1
 }
 
-# First, check beside this script, then the directory from which it was launched.
-find_target_in_dir "$SCRIPT_DIR" || true
-find_target_in_dir "$PWD" || true
-
-# Then check the active window process and its descendants.
-if [[ -z "$FILE_PATH" && -n "$ACTIVE_WIN" ]]; then
+find_target_in_dir "$PWD"
+if [[ -n "$ACTIVE_WIN" ]]; then
     WINDOW_PID=$(xdotool getwindowpid "$ACTIVE_WIN" 2>/dev/null || true)
+    search_pid_tree_for_targets "$WINDOW_PID"
+fi
+find_target_in_dir "$SCRIPT_DIR"
 
-    if [[ -n "$WINDOW_PID" ]]; then
-        search_pid_tree_for_target "$WINDOW_PID" || true
-    fi
+if ((${#INVENTORIES[@]} == 1)); then
+    FILE_PATH="${INVENTORIES[0]}"
+elif ((${#INVENTORIES[@]} > 1)); then
+    # Rofi returns the original row index, including when the list is filtered.
+    INVENTORY_INDEX=$(
+        for inventory in "${INVENTORIES[@]}"; do
+            printf '%s — %s\n' "$(basename -- "$(dirname -- "$inventory")")" "$inventory"
+        done | rofi -dmenu -i -no-custom -format i -p "Select project inventory:" -matching normal
+    ) || exit 0
+    [[ "$INVENTORY_INDEX" =~ ^[0-9]+$ ]] || exit 0
+    ((INVENTORY_INDEX < ${#INVENTORIES[@]})) || exit 0
+    FILE_PATH="${INVENTORIES[INVENTORY_INDEX]}"
 fi
 
 LIST_ACTION="2. Create/update project file list"
@@ -1016,10 +1008,10 @@ show_move_prompt() {
 if [[ -z "$FILE_PATH" ]]; then
     if command -v zenity >/dev/null 2>&1; then
         zenity --info --title="No file list found" \
-            --text="Could not find FILEPATH.md (or a legacy file_path/file_path.txt) beside the script, in the current directory, or in the active project's process tree. Project and Git prompts remain available." \
+            --text="Could not find FILEPATH.md (or a legacy file_path.md/file_path/file_path.txt) beside the script, in the current directory, or in the active window's process tree. Project and Git prompts remain available." \
             2>/dev/null || true
     elif command -v rofi >/dev/null 2>&1; then
-        rofi -e "No FILEPATH.md (or legacy file_path/file_path.txt) found. Project and Git prompts remain available." 2>/dev/null || true
+        rofi -e "No FILEPATH.md (or legacy file_path.md/file_path/file_path.txt) found. Project and Git prompts remain available." 2>/dev/null || true
     elif command -v notify-send >/dev/null 2>&1; then
         notify-send "No file list found" "Project and Git prompts remain available." -i dialog-information
     fi

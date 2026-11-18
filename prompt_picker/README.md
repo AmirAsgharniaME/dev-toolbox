@@ -22,15 +22,13 @@ chmod +x prompt_picker.sh
 ./prompt_picker.sh
 ```
 
-You can also run it with `bash prompt_picker.sh`. For convenient access, bind the script to a desktop keyboard shortcut or launch it from a terminal while the target project is open.
+You can also run it with `bash prompt_picker.sh`. A desktop shortcut can launch the same script; the existing Cinnamon Super+F binding needs no change. If multiple inventories are found, choose the project from the Rofi menu before continuing.
 
 ## Project file list
 
-The picker reads `FILEPATH.md` first. For backward compatibility, it also accepts the legacy names `file_path.md`, `file_path`, and `file_path.txt` when the renamed inventory is absent. It looks in these locations, in order:
+The picker checks its launch directory, the working directory of the active X11 window's process and every accessible descendant, and the directory containing the script. GNOME Terminal normally uses a shared server, so this can include projects from multiple open terminal sessions. It cannot determine which of those sessions is focused, and sessions outside the active window's process tree may not be discovered. Process working directories must be accessible and contain the inventory directly; parent directories are not searched.
 
-1. The directory containing `prompt_picker.sh`
-2. The current working directory
-3. The active window's process and its child processes, checking their working directories
+In each directory, `FILEPATH.md` takes precedence over the legacy names `file_path.md`, `file_path`, and `file_path.txt`. Resolved paths are deduplicated. When multiple inventories are found, Rofi shows the parent directory name and full inventory path; select one to use throughout that invocation. One inventory is selected automatically. Canceling the selection exits without generating a prompt. When none is found, the existing no-file menu offers Git and project prompts.
 
 The file list uses pipe separated records:
 

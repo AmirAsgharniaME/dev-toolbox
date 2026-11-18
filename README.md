@@ -20,6 +20,8 @@ bash prompt_helper/prompt_helper.sh
 bash translator/run_translator.sh
 ```
 
+Prompt Picker discovers inventories in its launch directory and the active window’s process tree. When it finds multiple inventories, choose one in Rofi; see its guide for discovery limits and shortcut details.
+
 The desktop flows are designed for Linux with an X11 session. See each utility's README for its required packages, clipboard and paste behavior, and setup details.
 
 ## Setup notes

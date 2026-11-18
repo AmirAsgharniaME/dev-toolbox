@@ -230,7 +230,7 @@ class PromptOutputTests(unittest.TestCase):
         except OSError as error:
             raise unittest.SkipTest(f'local Unix sockets are unavailable: {error}')
 
-    def run_prompt(self, action, groups=(), with_inventory=True,
+    def run_prompt(self, action, groups=(), with_inventory=True, root_files=None,
                    clipboard_fails=False, expected_return=0, expected_error=None):
         with tempfile.TemporaryDirectory(prefix='picker-output-test-') as tmp:
             root = Path(tmp)
@@ -271,7 +271,10 @@ class PromptOutputTests(unittest.TestCase):
                         if title == 'No file list found:':
                             answer = '2. Main Project Prompts'
                         elif title == 'Select File or Action:':
-                            answer = '2. Main Project Prompts'
+                            answer = ('\n'.join(root_files) if root_files is not None
+                                      else '2. Main Project Prompts')
+                        elif title == 'Action for target:':
+                            answer = action
                         elif title == 'Main Project Prompts:':
                             answer = action
                         elif title.startswith('Select target file or Done:'):
@@ -305,11 +308,24 @@ class PromptOutputTests(unittest.TestCase):
             self.assertFalse(server_errors, server_errors)
             self.assertIsNotNone(process)
             self.assertEqual(process.returncode, expected_return, process.stderr)
+            if root_files is not None:
+                root_request = next(request for request in seen
+                                    if request['arguments'][request['arguments'].index('-p') + 1]
+                                    == 'Select File or Action:')
+                self.assertIn('-multi-select', root_request['arguments'])
+                self.assertIn('-multi-start', root_request['arguments'])
+                self.assertEqual(root_request['arguments'][
+                    root_request['arguments'].index('-multi-start') + 1], '2')
             self.assertTrue(process.stdout.strip(), 'prompt output must be non-empty')
             if expected_error:
                 self.assertIn(expected_error, process.stderr)
-            self.assertEqual(seen[-1]['arguments'][seen[-1]['arguments'].index('-p') + 1],
-                             'Generate prompt:')
+            if root_files is not None:
+                titles = [request['arguments'][request['arguments'].index('-p') + 1]
+                          for request in seen]
+                self.assertEqual(titles, ['Select File or Action:'])
+            else:
+                self.assertEqual(seen[-1]['arguments'][seen[-1]['arguments'].index('-p') + 1],
+                                 'Generate prompt:')
             return process.stdout
 
     def test_no_file_prompt_is_printed(self):
@@ -326,6 +342,18 @@ class PromptOutputTests(unittest.TestCase):
             'MD | Readme | README.md', 'PY | Picker UI | prompt_picker/picker_ui.py']])
         self.assertIn('Target file:\nREADME.md', output)
         self.assertIn('Target file:\nprompt_picker/picker_ui.py', output)
+
+    def test_root_inventory_uses_shared_multi_select_and_commits_multiple_files(self):
+        root_files = ['MD | Readme | README.md',
+                      'PY | Picker UI | prompt_picker/picker_ui.py']
+        output = self.run_prompt('', root_files=root_files)
+        self.assertIn('Selected files:', output)
+        self.assertIn('README.md', output)
+        self.assertIn('prompt_picker/picker_ui.py', output)
+
+    def test_root_inventory_single_file_commits_without_another_menu(self):
+        output = self.run_prompt('', root_files=['MD | Readme | README.md'])
+        self.assertIn('Selected files: Readme file in the path: `README.md`.', output)
 
     def test_multi_file_multiple_groups_keep_target_and_source_separate(self):
         output = self.run_prompt('14. Sync / Adapt with another file...', groups=[

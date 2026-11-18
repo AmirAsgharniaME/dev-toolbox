@@ -155,6 +155,32 @@ class PickerGuiTests(unittest.TestCase):
         self.assertIn('alpha.py', output)
         self.assertNotIn('alpha.md', output)
 
+    def test_root_inventory_multi_select_done_is_keyboard_reachable(self):
+        self.keys('Left', 'Down', 'Up', 'Right')
+        self.wait_menu('MENU 1 Select File or Action:', 1)
+
+        # The two action rows precede inventory rows. Toggle two files, then
+        # highlight the last selected file so Right reveals and focuses Done.
+        self.keys('Down', 'Down', 'Return', 'Down', 'Return', 'Right')
+        self.assertIsNone(self.app.poll(), 'Right must not commit the root group')
+        self.keys('Return')
+        output, _ = self.app.communicate(timeout=8)
+        self.assertIn('alpha.md', output)
+        self.assertIn('alpha.py', output)
+        self.assertNotIn('Action for target:', self.log_path.read_text())
+
+    def test_root_inventory_single_file_done_finishes_without_another_menu(self):
+        self.keys('Left', 'Down', 'Up', 'Right')
+        self.wait_menu('MENU 1 Select File or Action:', 1)
+        self.keys('Down', 'Down', 'Return', 'Right')
+        self.assertIsNone(self.app.poll(), 'Right must reveal Done without committing')
+        self.keys('Return')
+        output, _ = self.app.communicate(timeout=8)
+        self.assertIn('alpha.md', output)
+        log = self.log_path.read_text()
+        self.assertNotIn('Action for target:', log)
+        self.assertNotIn('MENU 2', log)
+
     def test_window_manager_close_cancels_without_output(self):
         if not shutil.which('wmctrl'):
             self.skipTest('wmctrl is unavailable')

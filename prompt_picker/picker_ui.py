@@ -335,6 +335,8 @@ def run_window(script):
                 print('MENU', index, self.title, request['items'], file=sys.stderr, flush=True)
             self.by_index = '-format' in args and args[args.index('-format') + 1] == 'i'
             self.multi = '-multi-select' in args
+            self.multi_start = (int(args[args.index('-multi-start') + 1])
+                                if '-multi-start' in args else 0)
             self.group_info = args[args.index('-group') + 1] if '-group' in args else ''
             self.final_summary = args[args.index('-summary') + 1] if '-summary' in args else ''
             self.custom = '-no-custom' not in args
@@ -345,7 +347,8 @@ def run_window(script):
             if self.final_summary:
                 self.selection_label.set_text('Selections: ' + self.final_summary)
             prior_value = previous['value']
-            self.multi_selection = MultiSelection(request['items'], prior_value or []) if self.multi else None
+            prior_selection = prior_value if isinstance(prior_value, list) else []
+            self.multi_selection = MultiSelection(request['items'], prior_selection) if self.multi else None
             if self.multi:
                 self.selection_panel.show_all()
             else:
@@ -369,8 +372,11 @@ def run_window(script):
             return False
 
         def populate(self, preferred=None):
-            if self.multi and isinstance(preferred, list):
-                preferred = preferred_multi_index(preferred)
+            if self.multi:
+                if isinstance(preferred, list):
+                    preferred = preferred_multi_index(preferred)
+                elif preferred in self.request['items']:
+                    preferred = self.request['items'].index(preferred)
             if preferred is None:
                 model, row = self.view.get_selection().get_selected()
                 if row is not None:
@@ -383,7 +389,8 @@ def run_window(script):
             for index, item in enumerate(self.request['items']):
                 if not matches_filter(item, text, self.fuzzy):
                     continue
-                display = self.multi_selection.display(index) if self.multi else item
+                display = (self.multi_selection.display(index)
+                           if self.multi and index >= self.multi_start else item)
                 row = self.model.append([display, index])
                 value = str(index) if self.by_index else item
                 if preferred == (index if self.multi else value):
@@ -413,15 +420,19 @@ def run_window(script):
             if row is None:
                 return
             index = int(model[row][1])
+            if index < self.multi_start:
+                self.accept_single()
+                return
             self.multi_selection.toggle(index)
             self.populate(index)
             self.update_selection_summary()
 
-        def row_activated(self, _view, _path, _column):
-            if self.multi:
+        def row_activated(self, _view, path, _column):
+            model_iter = self.model.get_iter(path)
+            if self.multi and int(self.model[model_iter][1]) >= self.multi_start:
                 self.toggle_current()
             else:
-                self.accept()
+                self.accept_single() if self.multi else self.accept()
 
         def update_selection_summary(self):
             if not getattr(self, 'multi', False):
@@ -477,6 +488,17 @@ def run_window(script):
             conn, self.pending = self.pending, None
             self.reply(conn, value)
 
+        def accept_single(self):
+            """Commit a non-file action row in a mixed multi-select menu."""
+            if not self.pending:
+                return
+            value = self.selected_value()
+            if value is None:
+                return
+            self.history.choose(self.current, self.request, value)
+            conn, self.pending = self.pending, None
+            self.reply(conn, value)
+
         def back(self):
             if self.pending and self.current > 0:
                 self.start_worker(self.current - 1)
@@ -524,7 +546,7 @@ def run_window(script):
                     model, row = self.view.get_selection().get_selected()
                     position = model.get_path(row).get_indices()[0] if row else None
                     highlighted_item = int(model[row][1]) if row else None
-                    if multi_right_moves_to_done(
+                    if highlighted_item is not None and highlighted_item >= self.multi_start and multi_right_moves_to_done(
                             highlighted_item, self.multi_selection.last_selected):
                         self.multi_done_revealed = True
                         self.done_button.show()
@@ -541,6 +563,10 @@ def run_window(script):
                 self.close_window(); return True
             if event.keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
                 if self.multi:
+                    model, row = self.view.get_selection().get_selected()
+                    if row is not None and int(model[row][1]) < self.multi_start:
+                        self.accept_single()
+                        return True
                     action = multi_key_action(
                         'Return' if event.keyval == Gdk.KEY_Return else 'KP_Enter',
                         self.view.has_focus(), self.done_button.has_focus())

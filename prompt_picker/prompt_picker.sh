@@ -674,7 +674,7 @@ report_prompt_error() {
 }
 
 copy_and_paste_prompt() {
-    local prompt="$1"
+    local prompt="$1" require_confirmation="${2:-1}"
     local window_class="" paste_key="shift+Insert" clipboard_tool clipboard_text
     local primary_ok=0 focused_win=""
 
@@ -687,8 +687,10 @@ copy_and_paste_prompt() {
     local confirmation
     local -a confirmation_args=(-dmenu -i -no-custom -p "Generate prompt:" -matching normal)
     [[ -n "$SELECTION_SUMMARY" ]] && confirmation_args+=(-summary "$SELECTION_SUMMARY")
-    confirmation=$(printf '%s\n' "Generate prompt" | rofi "${confirmation_args[@]}") || return 1
-    [[ "$confirmation" == "Generate prompt" ]] || return 1
+    if [[ "$require_confirmation" == "1" ]]; then
+        confirmation=$(printf '%s\n' "Generate prompt" | rofi "${confirmation_args[@]}") || return 1
+        [[ "$confirmation" == "Generate prompt" ]] || return 1
+    fi
 
     # Always expose the generated prompt to callers and terminal users.
     printf '%s\n' "$prompt"
@@ -1095,12 +1097,6 @@ if [[ -z "$FILE_PATH" ]]; then
     [[ "$PIPELINE_SELECTED" -eq 1 ]] || exit 0
 fi
 
-ACTIONS=(
-    "1. None (Just Paste File Path)"
-    "2. Add File Path"
-    "3. Done"
-)
-
 # Normalize the file list once and reuse the same snapshot in every menu.
 # A new invocation reloads the list after project-list updates.
 if [[ -n "$FILE_PATH" ]]; then
@@ -1108,62 +1104,40 @@ if [[ -n "$FILE_PATH" ]]; then
 else
     FILE_MENU_LIST=""
 fi
-MAIN_MENU_LIST=$(printf '%s\n' "$GIT_PROMPTS_ACTION" "$MAIN_PROJECT_PROMPTS_ACTION" "$FILE_MENU_LIST")
+select_root_files() {
+    local -a items=()
 
-# Keep collecting files until another action is selected.
-while [[ -z "$CHOSEN_ACTION" ]]; do
-    MENU_LIST="$MAIN_MENU_LIST"
-    if ((SELECTED_COUNT > 0)); then
-        MENU_LIST="$FILE_MENU_LIST"
-    fi
-    SELECTED_LINE=$(
-        printf '%s\n' "$MENU_LIST" |
-            rofi -dmenu -i -no-custom -p "Select File or Action:" -matching normal
-    )
+    items+=("$GIT_PROMPTS_ACTION" "$MAIN_PROJECT_PROMPTS_ACTION")
+    while IFS= read -r line; do
+        [[ -n "$line" ]] && items+=("$line")
+    done <<< "$FILE_MENU_LIST"
 
-    if [[ -z "$SELECTED_LINE" ]]; then
-        exit 0
-    fi
+    printf '%s\n' "${items[@]}" |
+        rofi -dmenu -i -no-custom -multi-select -multi-start 2 \
+            -group "root files" -p "Select File or Action:" -matching normal
+}
 
-    if [[ "$SELECTED_LINE" == "$LIST_ACTION" ]]; then
-        copy_and_paste_prompt "$(make_list_prompt)" || exit 1
-        exit 0
-    fi
-
-    if [[ "$SELECTED_LINE" == "$GIT_PROMPTS_ACTION" ]]; then
-        show_git_prompts_menu || exit 1
-        exit 0
-    fi
-
-    if [[ "$SELECTED_LINE" == "$MAIN_PROJECT_PROMPTS_ACTION" ]]; then
-        show_main_project_prompts_menu || exit 1
-        if [[ "$PIPELINE_SELECTED" -eq 0 ]]; then
-            exit 0
-        fi
-        break
-    fi
-
-    CURRENT_DESC=$(describe_menu_line "$SELECTED_LINE")
-    if [[ -n "$TARGET_DESC" ]]; then
-        TARGET_DESC+=" And $CURRENT_DESC"
-    else
-        TARGET_DESC="$CURRENT_DESC"
-    fi
-    ((SELECTED_COUNT += 1))
-
-    # Step 2: Add another file or choose the action for the collected files.
-    CHOSEN_ACTION=$(
-        printf '%s\n' "${ACTIONS[@]}" |
-            rofi -dmenu -i -no-custom -p "Action for target:" -matching fuzzy
-    )
-
-    if [[ -z "$CHOSEN_ACTION" ]]; then
-        exit 0
-    fi
-
-    [[ "$CHOSEN_ACTION" == "2. Add File Path" ]] || break
-    CHOSEN_ACTION=""
-done
+# The initial mixed menu uses the shared multi-selection controller for file
+# rows while Git and Main Project Prompts remain ordinary single-choice rows.
+SELECTED_LINES=$(select_root_files) || exit 0
+[[ -n "$SELECTED_LINES" ]] || exit 0
+if [[ "$SELECTED_LINES" == "$GIT_PROMPTS_ACTION" ]]; then
+    show_git_prompts_menu || exit 1
+    exit 0
+elif [[ "$SELECTED_LINES" == "$MAIN_PROJECT_PROMPTS_ACTION" ]]; then
+    show_main_project_prompts_menu || exit 1
+    [[ "$PIPELINE_SELECTED" -eq 1 ]] || exit 0
+else
+    while IFS= read -r SELECTED_LINE; do
+        [[ -n "$SELECTED_LINE" ]] || continue
+        CURRENT_DESC=$(describe_menu_line "$SELECTED_LINE")
+        if [[ -n "$TARGET_DESC" ]]; then TARGET_DESC+=" And $CURRENT_DESC"; else TARGET_DESC="$CURRENT_DESC"; fi
+        ((SELECTED_COUNT += 1))
+    done <<< "$SELECTED_LINES"
+    FINAL_PROMPT="Selected files: $TARGET_DESC."
+    copy_and_paste_prompt "$FINAL_PROMPT" 0 || exit 1
+    exit 0
+fi
 
 FINAL_PROMPT=""
 

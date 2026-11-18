@@ -79,6 +79,62 @@ class PickerHistoryTests(unittest.TestCase):
             self.assertEqual(picker.wrapped_index(0, count, -1), count - 1)
             self.assertEqual(picker.wrapped_index(count - 1, count, 1), 0)
 
+    def test_multi_selection_toggles_checked_rows(self):
+        selection = picker.MultiSelection(['a.md', 'b.md'])
+        self.assertEqual(selection.values(), [])
+        self.assertTrue(selection.display(0).startswith('□'))
+        selection.toggle(1)
+        self.assertEqual(selection.values(), ['b.md'])
+        self.assertTrue(selection.display(1).startswith('✓'))
+        selection.toggle(1)
+        self.assertEqual(selection.values(), [])
+        self.assertTrue(selection.display(1).startswith('□'))
+
+    def test_selected_rows_survive_filtering(self):
+        selection = picker.MultiSelection(['alpha.md', 'beta.md', 'gamma.md'])
+        selection.toggle(0)
+        self.assertEqual(selection.visible('beta'), [(1, 'beta.md')])
+        self.assertEqual(selection.values(), ['alpha.md'])
+
+    def test_group_commit_advances_and_keeps_groups_separate(self):
+        history = picker.History()
+        group1 = request('a.md', 'b.md')
+        group2 = request('a.md', 'b.md')
+        history.choose(0, group1, [0])
+        self.assertEqual(history.prepare(1, group2)['value'], None)
+        history.choose(1, group2, [1])
+        self.assertEqual(history.steps[0]['value'], [0])
+        self.assertEqual(history.steps[1]['value'], [1])
+
+    def test_back_navigation_restores_group_selection(self):
+        history = picker.History()
+        history.choose(0, request('a.md', 'b.md'), [0])
+        history.choose(1, request('a.md', 'b.md'), [1])
+        restored = picker.MultiSelection(['a.md', 'b.md'],
+                                         history.prepare(0, request('a.md', 'b.md'))['value'])
+        self.assertEqual(restored.values(), ['a.md'])
+        self.assertEqual(picker.menu_reply_value(request('a.md', 'b.md'), [0]), 'a.md')
+
+    def test_final_group_values_remain_available_for_summary(self):
+        groups = [('target', ['a.md', 'b.md']), ('source', ['c.md'])]
+        summary = '; '.join(f'{name}: {", ".join(files)}' for name, files in groups)
+        self.assertEqual(summary, 'target: a.md, b.md; source: c.md')
+
+    def test_minimum_and_maximum_counts_are_validated(self):
+        selection = picker.MultiSelection(['a', 'b'], minimum=1, maximum=1)
+        self.assertEqual(selection.validation_error(), 'Select at least 1 file.')
+        selection.toggle(0)
+        self.assertIsNone(selection.validation_error())
+        selection.toggle(1)
+        self.assertEqual(selection.validation_error(), 'Select no more than 1 file.')
+
+    def test_ordinary_single_choice_and_no_selection_menu_contracts(self):
+        history = picker.History()
+        history.choose(0, request('only'), 'only')
+        self.assertEqual(history.steps[0]['value'], 'only')
+        self.assertEqual(picker.MultiSelection(['a']).validation_error(),
+                         'Select at least 1 file.')
+
 
 if __name__ == '__main__':
     unittest.main()

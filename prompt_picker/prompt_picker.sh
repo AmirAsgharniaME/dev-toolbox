@@ -672,7 +672,9 @@ copy_and_paste_prompt() {
 
     # Keep final execution separate from navigating between stages.
     local confirmation
-    confirmation=$(printf '%s\n' "Generate prompt" | rofi -dmenu -i -no-custom -p "Generate prompt:" -matching normal) || return 1
+    local -a confirmation_args=(-dmenu -i -no-custom -p "Generate prompt:" -matching normal)
+    [[ -n "$SELECTION_SUMMARY" ]] && confirmation_args+=(-summary "$SELECTION_SUMMARY")
+    confirmation=$(printf '%s\n' "Generate prompt" | rofi "${confirmation_args[@]}") || return 1
     [[ "$confirmation" == "Generate prompt" ]] || return 1
 
     # Always expose the generated prompt to callers and terminal users.
@@ -777,33 +779,32 @@ show_delete_branch_message() {
 select_prompt_target_files() {
     local selection_role="${1:-target}"
     local selected_line selected_type selected_label target_path
-    local targets=""
+    local targets="" raw_selection group_label
     local selection_prompt="Select ${selection_role} file or Done:"
     local manual_prompt="Enter ${selection_role} file path or choose Done:"
 
-    while true; do
-        if [[ -n "$FILE_PATH" ]]; then
-            selected_line=$(
-                printf '%s\n' "Done" "$FILE_MENU_LIST" |
-                    rofi -dmenu -i -no-custom -p "$selection_prompt" -matching normal
-            ) || return 1
-            [[ "$selected_line" == "Done" ]] && break
-            [[ -n "$selected_line" ]] || return 1
+    group_label="$selection_role (Group ${SELECTION_GROUP_INDEX:-1} of ${SELECTION_GROUP_COUNT:-1})"
+
+    if [[ -n "$FILE_PATH" ]]; then
+        raw_selection=$(printf '%s\n' "$FILE_MENU_LIST" |
+            rofi -dmenu -i -no-custom -multi-select -group "$group_label" -p "$selection_prompt" -matching normal) || return 1
+        [[ -n "$raw_selection" ]] || return 1
+        while IFS= read -r selected_line; do
+            [[ -n "$selected_line" ]] || continue
             parse_menu_line "$selected_line" selected_type selected_label target_path
-        else
+            if [[ -n "$targets" ]]; then targets+=" And $target_path"; else targets="$target_path"; fi
+        done <<< "$raw_selection"
+    else
+        while true; do
             target_path=$(printf '%s\n' "Done" |
                 rofi -dmenu -i -p "$manual_prompt" -matching normal) || return 1
             target_path=$(trim_input "$target_path")
             [[ "$target_path" == "Done" ]] && break
             [[ -n "$target_path" ]] || return 1
-        fi
 
-        if [[ -n "$targets" ]]; then
-            targets+=" And $target_path"
-        else
-            targets="$target_path"
-        fi
-    done
+            if [[ -n "$targets" ]]; then targets+=" And $target_path"; else targets="$target_path"; fi
+        done
+    fi
 
     [[ -n "$targets" ]] || return 1
     printf '%s' "$targets"
@@ -828,44 +829,56 @@ show_main_project_prompts_menu() {
         "$STATE_ACTION") copy_and_paste_prompt "$(make_state_update_prompt)" ;;
         "$FIX_MARKDOWN_ACTION")
             file_path=$(select_prompt_target_files) || return 0
+            SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
             copy_and_paste_prompt "$(make_fix_markdown_prompt "$file_path")"
             ;;
         "$SCIENTIFIC_COPY_EDITOR_ACTION")
             file_path=$(select_prompt_target_files) || return 0
+            SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
             copy_and_paste_prompt "$(make_scientific_copy_editor_prompt "$file_path")"
             ;;
         "$FIX_COMPILER_ACTION")
             file_path=$(select_prompt_target_files) || return 0
+            SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
             copy_and_paste_prompt "$(make_fix_compiler_prompt "$file_path")"
             ;;
         "$FIX_LOGIC_ACTION")
             file_path=$(select_prompt_target_files) || return 0
+            SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
             copy_and_paste_prompt "$(make_fix_logic_prompt "$file_path")"
             ;;
         "$REFACTOR_ACTION")
             file_path=$(select_prompt_target_files) || return 0
+            SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
             copy_and_paste_prompt "$(make_refactor_prompt "$file_path")"
             ;;
         "$REWRITE_ACTION")
             file_path=$(select_prompt_target_files) || return 0
+            SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
             copy_and_paste_prompt "$(make_rewrite_prompt "$file_path")"
             ;;
         "$SYNC_ADAPT_ACTION")
             local source_paths
+            SELECTION_SUMMARY=""; SELECTION_GROUP_COUNT=2; SELECTION_GROUP_INDEX=1
             file_path=$(select_prompt_target_files "target") || return 0
+            SELECTION_GROUP_INDEX=2
             source_paths=$(select_prompt_target_files "source") || return 0
+            SELECTION_SUMMARY="target (Group 1 of 2): $file_path; source (Group 2 of 2): $source_paths"
             copy_and_paste_prompt "Please update and sync $file_path based on the interface and changes introduced in $source_paths."
             ;;
         "$BACKUP_FILE_ACTION")
             file_path=$(select_prompt_target_files) || return 0
+            SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
             copy_and_paste_prompt "$(make_backup_file_prompt "$file_path")"
             ;;
         "$RESTORE_FILE_ACTION")
             file_path=$(select_prompt_target_files) || return 0
+            SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
             copy_and_paste_prompt "$(make_restore_file_prompt "$file_path")"
             ;;
         "$PROJECT_PIPELINE_ACTION"|"$CLASS_PIPELINE_ACTION"|"$FUNCTION_PIPELINE_ACTION")
             file_path=$(select_prompt_target_files) || return 0
+            SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
             CHOSEN_ACTION="$chosen_action"
             TARGET_DESC="$file_path"
             SELECTED_COUNT=1

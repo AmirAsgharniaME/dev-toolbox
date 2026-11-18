@@ -48,6 +48,13 @@ class History:
             step['value'] = value
 
 
+def menu_reply_value(request, value):
+    """Turn stored multi-row indices back into the shell menu's line format."""
+    if isinstance(value, list):
+        return '\n'.join(request['items'][row] for row in value)
+    return value
+
+
 def matches_filter(item, text, fuzzy=False):
     item, text = item.casefold(), text.casefold()
     if not fuzzy:
@@ -66,6 +73,40 @@ def wrapped_index(index, count, direction):
     if count == 1:
         return 0
     return (index + direction) % count
+
+
+class MultiSelection:
+    """A stable selection of original menu rows, independent of filtering."""
+    def __init__(self, items, selected=None, minimum=1, maximum=None):
+        self.items = list(items)
+        self.selected = set(selected or [])
+        self.minimum = minimum
+        self.maximum = maximum
+
+    def toggle(self, index):
+        if index in self.selected:
+            self.selected.remove(index)
+        else:
+            self.selected.add(index)
+
+    def visible(self, text='', fuzzy=False):
+        return [(index, item) for index, item in enumerate(self.items)
+                if matches_filter(item, text, fuzzy)]
+
+    def values(self):
+        return [item for index, item in enumerate(self.items) if index in self.selected]
+
+    def display(self, index):
+        marker = '✓  ' if index in self.selected else '□  '
+        return marker + self.items[index]
+
+    def validation_error(self):
+        count = len(self.selected)
+        if count < self.minimum:
+            return f"Select at least {self.minimum} file{'s' if self.minimum != 1 else ''}."
+        if self.maximum is not None and count > self.maximum:
+            return f"Select no more than {self.maximum} file{'s' if self.maximum != 1 else ''}."
+        return None
 
 
 def run_window(script):
@@ -102,6 +143,9 @@ def run_window(script):
             self.add(box)
             self.label = Gtk.Label(xalign=0)
             box.pack_start(self.label, False, False, 0)
+            self.selection_label = Gtk.Label(xalign=0)
+            self.selection_label.set_line_wrap(True)
+            box.pack_start(self.selection_label, False, False, 0)
             self.entry = Gtk.Entry()
             self.entry.set_placeholder_text('Type to filter; Ctrl+B / Ctrl+F move the text cursor')
             self.entry.connect('key-press-event', self.key_pressed)
@@ -112,7 +156,7 @@ def run_window(script):
             self.view.set_headers_visible(False)
             self.view.append_column(Gtk.TreeViewColumn('', Gtk.CellRendererText(), text=0))
             self.view.connect('key-press-event', self.key_pressed)
-            self.view.connect('row-activated', lambda *_: self.accept())
+            self.view.connect('row-activated', self.row_activated)
             scroller = Gtk.ScrolledWindow()
             scroller.add(self.view)
             box.pack_start(scroller, True, True, 0)
@@ -124,9 +168,12 @@ def run_window(script):
             self.forward_button.connect('clicked', lambda *_: self.forward())
             cancel = Gtk.Button(label='Cancel')
             cancel.connect('clicked', self.close_window)
-            select = Gtk.Button(label='Select')
-            select.connect('clicked', lambda *_: self.accept())
-            for button in (self.back_button, self.forward_button, cancel, select):
+            self.toggle_button = Gtk.Button(label='Toggle file')
+            self.toggle_button.connect('clicked', lambda *_: self.toggle_current())
+            self.done_button = Gtk.Button(label='Select')
+            self.done_button.connect('clicked', lambda *_: self.accept())
+            for button in (self.back_button, self.forward_button, cancel,
+                           self.toggle_button, self.done_button):
                 buttons.add(button)
             box.pack_start(buttons, False, False, 0)
             threading.Thread(target=self.serve, daemon=True).start()
@@ -208,7 +255,7 @@ def run_window(script):
                     conn.close()
                     self.close_window()
                 else:
-                    self.reply(conn, previous['value'])
+                    self.reply(conn, menu_reply_value(request, previous['value']))
                 return False
             self.current = index
             self.pending = conn
@@ -218,13 +265,20 @@ def run_window(script):
             if os.environ.get('PICKER_DEBUG'):
                 print('MENU', index, self.title, request['items'], file=sys.stderr, flush=True)
             self.by_index = '-format' in args and args[args.index('-format') + 1] == 'i'
+            self.multi = '-multi-select' in args
+            self.group_info = args[args.index('-group') + 1] if '-group' in args else ''
+            self.final_summary = args[args.index('-summary') + 1] if '-summary' in args else ''
             self.custom = '-no-custom' not in args
             self.fuzzy = '-matching' in args and args[args.index('-matching') + 1] == 'fuzzy'
             self.label.set_text(self.title)
+            if self.final_summary:
+                self.selection_label.set_text('Selections: ' + self.final_summary)
             prior_value = previous['value']
+            self.multi_selection = MultiSelection(request['items'], prior_value or []) if self.multi else None
             custom_value = prior_value if self.custom and prior_value not in request['items'] else ''
-            self.entry.set_text(custom_value or '')
+            self.entry.set_text('' if self.multi else (custom_value or ''))
             self.populate(prior_value)
+            self.update_selection_summary()
             self.update_buttons()
             self.entry.grab_focus()
             return False
@@ -241,7 +295,8 @@ def run_window(script):
             for index, item in enumerate(self.request['items']):
                 if not matches_filter(item, text, self.fuzzy):
                     continue
-                row = self.model.append([item, index])
+                display = self.multi_selection.display(index) if self.multi else item
+                row = self.model.append([display, index])
                 value = str(index) if self.by_index else item
                 if preferred == value:
                     match_row = row
@@ -263,8 +318,54 @@ def run_window(script):
                 return self.entry.get_text()
             return None
 
+        def toggle_current(self):
+            if not self.pending or not self.multi:
+                return
+            model, row = self.view.get_selection().get_selected()
+            if row is None:
+                return
+            self.multi_selection.toggle(int(model[row][1]))
+            self.populate()
+            self.update_selection_summary()
+
+        def row_activated(self, _view, _path, _column):
+            if self.multi:
+                self.toggle_current()
+            else:
+                self.accept()
+
+        def update_selection_summary(self):
+            if not getattr(self, 'multi', False):
+                self.selection_label.set_text(('Selections: ' + self.final_summary)
+                                               if self.final_summary else '')
+                self.done_button.set_label('Select')
+                self.done_button.set_sensitive(True)
+                return
+            values = self.multi_selection.values()
+            prefix = (self.group_info + ' — ') if self.group_info else ''
+            summary = ', '.join(values) if values else 'none'
+            if len(summary) > 180:
+                summary = summary[:177] + '…'
+            error = self.multi_selection.validation_error()
+            self.selection_label.set_text(
+                f'{prefix}Selected: {len(values)} file' + ('s' if len(values) != 1 else '') +
+                f' — {summary}' + (f' — {error}' if error else ''))
+            self.done_button.set_label('Done')
+            self.done_button.set_sensitive(error is None)
+
         def accept(self):
             if not self.pending:
+                return
+            if self.multi:
+                error = self.multi_selection.validation_error()
+                if error:
+                    self.selection_label.set_text(self.selection_label.get_text() + ' — ' + error)
+                    return
+                value = self.multi_selection.values()
+                self.history.choose(self.current, self.request,
+                                    sorted(self.multi_selection.selected))
+                conn, self.pending = self.pending, None
+                self.reply(conn, '\n'.join(value))
                 return
             value = self.selected_value()
             if value is None:
@@ -282,7 +383,8 @@ def run_window(script):
                 return
             # Moving forward can choose the highlighted item, but final output
             # always requires a separate explicit confirmation.
-            self.accept()
+            if not self.multi:
+                self.accept()
 
         def update_buttons(self):
             self.back_button.set_sensitive(self.current > 0)
@@ -304,7 +406,11 @@ def run_window(script):
             if event.keyval == Gdk.KEY_Escape:
                 self.close_window(); return True
             if event.keyval in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
-                self.accept(); return True
+                if self.multi:
+                    self.toggle_current()
+                else:
+                    self.accept()
+                return True
             if event.keyval in (Gdk.KEY_Up, Gdk.KEY_Down):
                 model, row = self.view.get_selection().get_selected()
                 if len(model):

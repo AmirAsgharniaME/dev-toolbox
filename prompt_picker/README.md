@@ -51,23 +51,20 @@ Choose **Create/update project file list** from the main menu to copy a prompt f
 
 ## Using the picker
 
-Select a file from the Rofi menu. Then choose an action, or choose **Add File Path** to select additional target files before choosing an action. Available actions include:
+Select a file from the Rofi menu. Choose **Add File Path** to collect more paths, then choose **Done** to print, copy, and paste the selected paths joined by `And`. You can also choose an action to generate a prompt for the selected file or files. Available actions include:
 
-- Paste the selected file path
-- Fix compiler or syntax issues
-- Fix logic or CFD implementation
-- Refactor or rewrite the selected code
-- Sync selected files with one or more dependency files
-- Run one of the staged C++ performance prompt pipelines for a project, class, or function
+- Choose **None (Just Paste File Path)** to print, copy, and paste the selected path or collected paths joined by `And`
 - Open the Git prompts menu
-- Open the main project prompts menu, including the AGENTS.md and file list prompts, the priority-3 Create STATE.md prompt, AGENT_REPORT.md and TASK_PLAN.md prompts, Exec-Task, the Update STATE.md prompt, Fix Markdown, and Scientific Copy Editor
+- Open the main project prompts menu, including the AGENTS.md and file list prompts, the priority-3 Create STATE.md prompt, AGENT_REPORT.md and TASK_PLAN.md prompts, Exec-Task, the Update STATE.md prompt, Fix Markdown, Scientific Copy Editor, Fix Compiler / Syntax Issues, Fix Logic / CFD Implementation, Refactor, Rewrite from Scratch, Sync / Adapt with another file, and all three staged C++ performance prompt pipelines
+
+The **15. ApexFVM: The 5-Stage C++ Performance Pipeline for Project**, **16. The 3-Stage C++ Performance Pipeline for Class**, and **17. The 3-Stage C++ Performance Pipeline for Function** options are in **Main Project Prompts**. Each asks you to select one or more target files, then choose a pipeline stage.
 
 The priority-3 **Create STATE.md** option generates a prompt to rewrite `STATE.md` as a fact-based, project-specific status reference, with a stable section structure, open questions for unverifiable details, and a dated change log.
 The **Create AGENT_REPORT.md** option generates a prompt for a fresh architectural report using a fixed five-section structure, without modifying C++ source files.
 The **Create TASK_PLAN.md** option generates a prompt to overwrite `TASK_PLAN.md` with a self-contained, atomic execution checklist derived from `AGENT_REPORT.md`, without modifying C++ source files.
 The **Exec-Task** option generates a prompt to execute only the first unchecked step in `TASK_PLAN.md`, verify it using that step's command, and update the checklist and execution log.
 The final **Update STATE.md** option generates a prompt to update `STATE.md` incrementally from the last change-log entry, using Git history and repository evidence while preserving the existing section structure.
-The **Fix Markdown** and **Scientific Copy Editor** options show the project file list repeatedly. Select one or more files, then choose **Done** to generate the prompt with their paths separated by `And`. If no file list is available, enter each path manually and choose **Done** when finished. Cancelling or choosing **Done** without selecting a file produces no prompt.
+The **Fix Markdown**, **Scientific Copy Editor**, **Fix Compiler / Syntax Issues**, **Fix Logic / CFD Implementation**, **Refactor**, and **Rewrite from Scratch** options show the project file list repeatedly. Select as many files as needed, then choose **Done** to generate the prompt with their paths separated by `And`. **Sync / Adapt with another file** first collects one or more target files until **Done** is selected, then collects one or more source files to use when updating those targets. Each list can contain as many files as needed, and paths are joined with `And`. If no file list is available, enter each path manually and choose **Done** when finished. Cancelling or choosing **Done** without selecting a file produces no prompt.
 The **Fix Markdown** prompt directs math-render repairs for each selected file. The **Scientific Copy Editor** prompt directs technical and scientific writing edits under `Markdown_Rules.md`, requests a backup before editing, and flags unsupported claims and inconsistencies while preserving math and document structure.
 
 The Git menu can create commit, push, branch, and file operation prompts. It generates prompt text; it does not execute Git commands itself. File remove, rename, and move actions collect paths and generate a prompt for an AI assistant.

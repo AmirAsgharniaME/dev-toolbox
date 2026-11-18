@@ -105,9 +105,22 @@ EXEC_TASK_ACTION="6. Exec-Task"
 STATE_ACTION="7. Update STATE.md"
 FIX_MARKDOWN_ACTION="8. Fix Markdown"
 SCIENTIFIC_COPY_EDITOR_ACTION="9. Scientific Copy Editor"
+FIX_COMPILER_ACTION="10. Fix Compiler / Syntax Issues"
+FIX_LOGIC_ACTION="11. Fix Logic / CFD Implementation"
+REFACTOR_ACTION="12. Refactor (Clean Code & Modern C++)"
+REWRITE_ACTION="13. Rewrite from Scratch"
+SYNC_ADAPT_ACTION="14. Sync / Adapt with another file..."
 DELETE_BRANCH_ACTION="Delete Current Branch"
 GIT_PROMPTS_ACTION="1. Git Prompts"
 MAIN_PROJECT_PROMPTS_ACTION="2. Main Project Prompts"
+PROJECT_PIPELINE_ACTION="15. ApexFVM: The 5-Stage C++ Performance Pipeline for Project"
+CLASS_PIPELINE_ACTION="16. The 3-Stage C++ Performance Pipeline for Class"
+FUNCTION_PIPELINE_ACTION="17. The 3-Stage C++ Performance Pipeline for Function"
+TARGET_DESC=""
+SELECTED_PATHS=""
+SELECTED_COUNT=0
+CHOSEN_ACTION=""
+PIPELINE_SELECTED=0
 
 make_delete_branch_message() {
     cat <<'PROMPT'
@@ -451,6 +464,26 @@ PROMPT
         "${template#*TARGET_FILE: \[put the file name here\]}"
 }
 
+make_fix_compiler_prompt() {
+    local target_paths="$1"
+    printf 'Please review and fix all C++ compiler errors, syntax issues, and clangd warnings in the following: %s.' "$target_paths"
+}
+
+make_fix_logic_prompt() {
+    local target_paths="$1"
+    printf 'Please inspect the implementation, mathematical logic, and CFD/numerical algorithm (loops, signs, and boundary conditions) to fix bugs in: %s.' "$target_paths"
+}
+
+make_refactor_prompt() {
+    local target_paths="$1"
+    printf 'Please refactor the following without altering its external behavior, applying modern C++ best practices and improving readability: %s.' "$target_paths"
+}
+
+make_rewrite_prompt() {
+    local target_paths="$1"
+    printf 'Please rewrite and redesign the following from scratch with a clean, modern, and high-performance C++ design: %s.' "$target_paths"
+}
+
 make_commit_changes_prompt() {
     cat <<'PROMPT'
 Please inspect the current git status and git diff of my C++ CFD project. Based on the latest modifications, perform the following steps precisely:
@@ -675,21 +708,24 @@ show_delete_branch_message() {
 }
 
 select_prompt_target_files() {
+    local selection_role="${1:-target}"
     local selected_line selected_type selected_label target_path
     local targets=""
+    local selection_prompt="Select ${selection_role} file or Done:"
+    local manual_prompt="Enter ${selection_role} file path or choose Done:"
 
     while true; do
         if [[ -n "$FILE_PATH" ]]; then
             selected_line=$(
                 printf '%s\n' "Done" "$FILE_MENU_LIST" |
-                    rofi -dmenu -i -no-custom -p "Select target file or Done:" -matching normal
+                    rofi -dmenu -i -no-custom -p "$selection_prompt" -matching normal
             ) || return 1
             [[ "$selected_line" == "Done" ]] && break
             [[ -n "$selected_line" ]] || return 1
             parse_menu_line "$selected_line" selected_type selected_label target_path
         else
             target_path=$(printf '%s\n' "Done" |
-                rofi -dmenu -i -p "Enter target file path or choose Done:" -matching normal) || return 1
+                rofi -dmenu -i -p "$manual_prompt" -matching normal) || return 1
             target_path=$(trim_input "$target_path")
             [[ "$target_path" == "Done" ]] && break
             [[ -n "$target_path" ]] || return 1
@@ -711,7 +747,7 @@ show_main_project_prompts_menu() {
     local file_path
 
     chosen_action=$(
-        printf '%s\n' "$AGENTS_ACTION" "$LIST_ACTION" "$CREATE_STATE_ACTION" "$AGENT_REPORT_ACTION" "$TASK_PLAN_ACTION" "$EXEC_TASK_ACTION" "$STATE_ACTION" "$FIX_MARKDOWN_ACTION" "$SCIENTIFIC_COPY_EDITOR_ACTION" |
+        printf '%s\n' "$AGENTS_ACTION" "$LIST_ACTION" "$CREATE_STATE_ACTION" "$AGENT_REPORT_ACTION" "$TASK_PLAN_ACTION" "$EXEC_TASK_ACTION" "$STATE_ACTION" "$FIX_MARKDOWN_ACTION" "$SCIENTIFIC_COPY_EDITOR_ACTION" "$FIX_COMPILER_ACTION" "$FIX_LOGIC_ACTION" "$REFACTOR_ACTION" "$REWRITE_ACTION" "$SYNC_ADAPT_ACTION" "$PROJECT_PIPELINE_ACTION" "$CLASS_PIPELINE_ACTION" "$FUNCTION_PIPELINE_ACTION" |
             rofi -dmenu -i -no-custom -p "Main Project Prompts:" -matching fuzzy
     )
 
@@ -730,6 +766,39 @@ show_main_project_prompts_menu() {
         "$SCIENTIFIC_COPY_EDITOR_ACTION")
             file_path=$(select_prompt_target_files) || return 0
             copy_and_paste_prompt "$(make_scientific_copy_editor_prompt "$file_path")"
+            ;;
+        "$FIX_COMPILER_ACTION")
+            file_path=$(select_prompt_target_files) || return 0
+            copy_and_paste_prompt "$(make_fix_compiler_prompt "$file_path")"
+            ;;
+        "$FIX_LOGIC_ACTION")
+            file_path=$(select_prompt_target_files) || return 0
+            copy_and_paste_prompt "$(make_fix_logic_prompt "$file_path")"
+            ;;
+        "$REFACTOR_ACTION")
+            file_path=$(select_prompt_target_files) || return 0
+            copy_and_paste_prompt "$(make_refactor_prompt "$file_path")"
+            ;;
+        "$REWRITE_ACTION")
+            file_path=$(select_prompt_target_files) || return 0
+            copy_and_paste_prompt "$(make_rewrite_prompt "$file_path")"
+            ;;
+        "$SYNC_ADAPT_ACTION")
+            local source_paths
+            file_path=$(select_prompt_target_files "target") || return 0
+            source_paths=$(select_prompt_target_files "source") || return 0
+            copy_and_paste_prompt "Please update and sync $file_path based on the interface and changes introduced in $source_paths."
+            ;;
+        "$PROJECT_PIPELINE_ACTION"|"$CLASS_PIPELINE_ACTION"|"$FUNCTION_PIPELINE_ACTION")
+            file_path=$(select_prompt_target_files) || return 0
+            CHOSEN_ACTION="$chosen_action"
+            TARGET_DESC="$file_path"
+            SELECTED_COUNT=1
+            while [[ "$file_path" == *" And "* ]]; do
+                ((SELECTED_COUNT += 1))
+                file_path="${file_path#* And }"
+            done
+            PIPELINE_SELECTED=1
             ;;
     esac
 }
@@ -967,33 +1036,32 @@ if [[ -z "$FILE_PATH" ]]; then
         "$MAIN_PROJECT_PROMPTS_ACTION") show_main_project_prompts_menu || exit 1 ;;
         *) exit 0 ;;
     esac
-    exit 0
+    [[ "$PIPELINE_SELECTED" -eq 1 ]] || exit 0
 fi
 
 ACTIONS=(
     "1. None (Just Paste File Path)"
     "2. Add File Path"
-    "3. Fix Compiler / Syntax Issues"
-    "4. Fix Logic / CFD Implementation"
-    "5. Refactor (Clean Code & Modern C++)"
-    "6. Rewrite from Scratch"
-    "7. Sync / Adapt with another file..."
-    "8. ApexFVM : The 5-Stage C++ Performance Pipeline For Project"
-    "9. The 3-Stage C++ Performance Pipeline For Class"
-    "10. The 3-Stage C++ Performance Pipeline For Function"
+    "3. Done"
 )
 
 # Normalize the file list once and reuse the same snapshot in every menu.
 # A new invocation reloads the list after project-list updates.
-FILE_MENU_LIST=$(get_file_menu_list)
+if [[ -n "$FILE_PATH" ]]; then
+    FILE_MENU_LIST=$(get_file_menu_list)
+else
+    FILE_MENU_LIST=""
+fi
 MAIN_MENU_LIST=$(printf '%s\n' "$GIT_PROMPTS_ACTION" "$MAIN_PROJECT_PROMPTS_ACTION" "$FILE_MENU_LIST")
 
 # Keep collecting files until another action is selected.
-TARGET_DESC=""
-SELECTED_COUNT=0
-while true; do
+while [[ -z "$CHOSEN_ACTION" ]]; do
+    MENU_LIST="$MAIN_MENU_LIST"
+    if ((SELECTED_COUNT > 0)); then
+        MENU_LIST="$FILE_MENU_LIST"
+    fi
     SELECTED_LINE=$(
-        printf '%s\n' "$MAIN_MENU_LIST" |
+        printf '%s\n' "$MENU_LIST" |
             rofi -dmenu -i -no-custom -p "Select File or Action:" -matching normal
     )
 
@@ -1013,7 +1081,10 @@ while true; do
 
     if [[ "$SELECTED_LINE" == "$MAIN_PROJECT_PROMPTS_ACTION" ]]; then
         show_main_project_prompts_menu || exit 1
-        exit 0
+        if [[ "$PIPELINE_SELECTED" -eq 0 ]]; then
+            exit 0
+        fi
+        break
     fi
 
     CURRENT_DESC=$(describe_menu_line "$SELECTED_LINE")
@@ -1023,6 +1094,11 @@ while true; do
         TARGET_DESC+=" And $CURRENT_DESC"
     else
         TARGET_DESC="$CURRENT_DESC"
+    fi
+    if [[ -n "$SELECTED_PATHS" ]]; then
+        SELECTED_PATHS+=" And $TARGET_PATH"
+    else
+        SELECTED_PATHS="$TARGET_PATH"
     fi
     ((SELECTED_COUNT += 1))
 
@@ -1037,53 +1113,13 @@ while true; do
     fi
 
     [[ "$CHOSEN_ACTION" == "2. Add File Path" ]] || break
+    CHOSEN_ACTION=""
 done
 
 FINAL_PROMPT=""
 
 case "$CHOSEN_ACTION" in
-    *"Fix Compiler / Syntax Issues"*)
-        FINAL_PROMPT="Please review and fix all C++ compiler errors, syntax issues, and clangd warnings in the following: $TARGET_DESC."
-        ;;
-    *"Fix Logic / CFD Implementation"*)
-        FINAL_PROMPT="Please inspect the implementation, mathematical logic, and CFD/numerical algorithm (loops, signs, and boundary conditions) to fix bugs in: $TARGET_DESC."
-        ;;
-    *"Refactor"*)
-        FINAL_PROMPT="Please refactor the following without altering its external behavior, applying modern C++ best practices and improving readability: $TARGET_DESC."
-        ;;
-    *"Rewrite from Scratch"*)
-        FINAL_PROMPT="Please rewrite and redesign the following from scratch with a clean, modern, and high-performance C++ design: $TARGET_DESC."
-        ;;
-    *"Sync / Adapt"*)
-        # Collect one or more base/dependency files for the selected targets.
-        DEP_DESC=""
-        while true; do
-            DEP_LINE=$(
-                printf '%s\n' "$FILE_MENU_LIST" |
-                    rofi -dmenu -i -no-custom -p "Select Base/Dependency File:" -matching normal
-            )
-
-            [[ -n "$DEP_LINE" ]] || exit 0
-
-            CURRENT_DEP_DESC=$(describe_menu_line "$DEP_LINE")
-            if [[ -n "$DEP_DESC" ]]; then
-                DEP_DESC+=" And $CURRENT_DEP_DESC"
-            else
-                DEP_DESC="$CURRENT_DEP_DESC"
-            fi
-
-            SYNC_DEP_ACTION=$(
-                printf '%s\n' "2. Add File Path" "3. Done" |
-                    rofi -dmenu -i -no-custom -p "Add another base/dependency file?" -matching fuzzy
-            )
-
-            [[ -n "$SYNC_DEP_ACTION" ]] || exit 0
-            [[ "$SYNC_DEP_ACTION" == "2. Add File Path" ]] || break
-        done
-
-        FINAL_PROMPT="Please update and sync $TARGET_DESC based on the interface and changes introduced in $DEP_DESC."
-        ;;
-    *"ApexFVM : The 5-Stage C++ Performance Pipeline For Project"*)
+    *"ApexFVM: The 5-Stage C++ Performance Pipeline for Project"*)
         APEXFVM_STAGES=(
             "Stage 1: Heap Memory Audit & Pre-allocation"
             "Stage 2: Reference Pass & Move Semantics Optimization"
@@ -1185,7 +1221,7 @@ PROMPT
                 ;;
         esac
         ;;
-    *"The 3-Stage C++ Performance Pipeline For Class"*)
+    *"The 3-Stage C++ Performance Pipeline for Class"*)
         CLASS_STAGES=(
             "Stage 1: Memory Encapsulation & Rule of Five"
             "Stage 2: Accessor APIs, Const-Overloading & Inlining"
@@ -1250,7 +1286,7 @@ PROMPT
                 ;;
         esac
         ;;
-    *"The 3-Stage C++ Performance Pipeline For Function"*)
+    *"The 3-Stage C++ Performance Pipeline for Function"*)
         FUNCTION_STAGES=(
             "Stage 1: Inlining & Compile-Time Evaluation"
             "Stage 2: Parameter Passing & Const-Correctness"
@@ -1313,8 +1349,8 @@ PROMPT
                 ;;
         esac
         ;;
-    *"None"*)
-        FINAL_PROMPT="$TARGET_DESC"
+    "1. None (Just Paste File Path)"|"3. Done")
+        FINAL_PROMPT="$SELECTED_PATHS"
         ;;
     *)
         exit 1

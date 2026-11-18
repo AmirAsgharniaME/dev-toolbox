@@ -119,6 +119,7 @@ MAIN_PROJECT_PROMPTS_ACTION="2. Main Project Prompts"
 PROJECT_PIPELINE_ACTION="15. ApexFVM: The 5-Stage C++ Performance Pipeline for Project"
 CLASS_PIPELINE_ACTION="16. The 3-Stage C++ Performance Pipeline for Class"
 FUNCTION_PIPELINE_ACTION="17. The 3-Stage C++ Performance Pipeline for Function"
+BACKUP_FILE_ACTION="18. Backup File"
 TARGET_DESC=""
 SELECTED_COUNT=0
 CHOSEN_ACTION=""
@@ -277,6 +278,35 @@ Do not change any code, build files, or other documents. Do not record chat disc
 
 Report: list the sections you changed, the change log entry you added, and anything you placed under open questions.
 PROMPT
+}
+
+make_backup_file_prompt() {
+    local file_paths="$1"
+    local remaining="$file_paths"
+    local target_path
+    local prompt=""
+
+    while [[ -n "$remaining" ]]; do
+        if [[ "$remaining" == *" And "* ]]; then
+            target_path="${remaining%% And *}"
+            remaining="${remaining#* And }"
+        else
+            target_path="$remaining"
+            remaining=""
+        fi
+
+        [[ -n "$prompt" ]] && prompt+=$'\n\n'
+        prompt+="Target file:
+$target_path
+
+Create a backup of the target file in the same directory, using the original filename with \`.bak\` appended.
+
+The backup must be an exact, byte-for-byte copy of the target file. Do not edit, reformat, convert, or otherwise alter its contents. If a backup with that name already exists, overwrite it with the new backup.
+
+Do not modify the target file or any other file. Afterward, confirm the backup’s path and that it was created successfully."
+    done
+
+    printf '%s' "$prompt"
 }
 
 make_fix_markdown_prompt() {
@@ -754,7 +784,7 @@ show_main_project_prompts_menu() {
     local file_path
 
     chosen_action=$(
-        printf '%s\n' "$AGENTS_ACTION" "$LIST_ACTION" "$CREATE_STATE_ACTION" "$AGENT_REPORT_ACTION" "$TASK_PLAN_ACTION" "$EXEC_TASK_ACTION" "$STATE_ACTION" "$FIX_MARKDOWN_ACTION" "$SCIENTIFIC_COPY_EDITOR_ACTION" "$FIX_COMPILER_ACTION" "$FIX_LOGIC_ACTION" "$REFACTOR_ACTION" "$REWRITE_ACTION" "$SYNC_ADAPT_ACTION" "$PROJECT_PIPELINE_ACTION" "$CLASS_PIPELINE_ACTION" "$FUNCTION_PIPELINE_ACTION" |
+        printf '%s\n' "$AGENTS_ACTION" "$LIST_ACTION" "$CREATE_STATE_ACTION" "$AGENT_REPORT_ACTION" "$TASK_PLAN_ACTION" "$EXEC_TASK_ACTION" "$STATE_ACTION" "$FIX_MARKDOWN_ACTION" "$SCIENTIFIC_COPY_EDITOR_ACTION" "$FIX_COMPILER_ACTION" "$FIX_LOGIC_ACTION" "$REFACTOR_ACTION" "$REWRITE_ACTION" "$SYNC_ADAPT_ACTION" "$PROJECT_PIPELINE_ACTION" "$CLASS_PIPELINE_ACTION" "$FUNCTION_PIPELINE_ACTION" "$BACKUP_FILE_ACTION" |
             rofi -dmenu -i -no-custom -p "Main Project Prompts:" -matching fuzzy
     )
 
@@ -795,6 +825,10 @@ show_main_project_prompts_menu() {
             file_path=$(select_prompt_target_files "target") || return 0
             source_paths=$(select_prompt_target_files "source") || return 0
             copy_and_paste_prompt "Please update and sync $file_path based on the interface and changes introduced in $source_paths."
+            ;;
+        "$BACKUP_FILE_ACTION")
+            file_path=$(select_prompt_target_files) || return 0
+            copy_and_paste_prompt "$(make_backup_file_prompt "$file_path")"
             ;;
         "$PROJECT_PIPELINE_ACTION"|"$CLASS_PIPELINE_ACTION"|"$FUNCTION_PIPELINE_ACTION")
             file_path=$(select_prompt_target_files) || return 0

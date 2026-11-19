@@ -340,138 +340,30 @@ Do not delete or modify the backup file. After restoring, confirm the target fil
 }
 
 make_fix_markdown_prompt() {
-    local file_path="$1"
+    local target_file="$1"
     local template
 
     template=$(cat <<'PROMPT'
-# ROLE
-You are `markdown-math-render-fixer`: a repair tool for Markdown files whose
-LaTeX math fails to render. You receive one or more file paths. Return each file
-with render-breaking structure corrected and nothing else changed.
+Apply the formatting rules in RULES_FILE to TARGET_FILE. Change only formatting, not content.
 
-# INPUT
+TARGET_FILE: [put the file name here]
+RULES_FILE: Markdown_Rules.md
 
-TARGET FILE PATHS: User File Path
-
-Read each file at the exact paths listed above, separated by And. Apply the
-procedure to each document independently and return each corrected version
-whole. Do not infer additional paths from context.
-
-
-# ABSOLUTE CONSTRAINTS
-- Do NOT rewrite prose, reword sentences, translate, or "improve" the math.
-- Do NOT change symbols, subscripts, variable names, or equation content.
-- Do NOT reorder sections, renumber headings, or restructure arguments.
-- Every byte outside the specific edits below must be identical to the input.
-- If you are unsure whether a change is needed, leave it and list it in the
-  report under "needs human review". Conservative is correct.
-
-# HARD RULES (apply in this priority order)
-
-R1 — FATAL. Display math must start at column 0.
-  A line whose first non-space characters are `$$` may have NO leading
-  whitespace. Zero indentation, always.
-
-R2 — FATAL. No `$$` block may live inside a list item or a blockquote.
-  Detection: a `$$` opener that is indented, OR that appears after a list
-  marker (`-`, `*`, `+`, `1.`) with no intervening blank line at column 0.
-  Repair:
-    a. The lead-in line that introduced the block becomes a plain paragraph.
-       If that lead-in was a bullet, drop the bullet marker.
-       If it was a numbered item, absorb the number into bold text:
-         `1. **At the Right Boundary** ( $x = L$ ):`  ->  `**1. At the Right Boundary** ( $x = L$ ):`
-       Keep trailing colons.
-    b. Dedent the `$$` block to column 0.
-    c. Put exactly one blank line before the opener and one after the closer.
-    d. If the lead-in line was a nested bullet existing only to host the math,
-       remove the nesting entirely (R12 does not protect it here).
-
-R3 — Every `$$` block is exactly three parts: opener line, content lines,
-  closer line. Blank line before the opener, blank line after the closer.
-  Never `$$ content $$` on one line; split it.
-
-R4 — Blank line immediately after every ATX heading (`#`–`######`) and
-  immediately before it. A heading glued to the next paragraph swallows it
-  in most renderers.
-
-R5 — Inline math adjacent to parentheses needs one space inside the parens:
-    `($x=0$)`   ->  `( $x=0$ )`
-    `($\phi_b \approx \phi_P$)`  ->  `( $\phi_b \approx \phi_P$ )`
-  Applies everywhere, including inside headings. Do not add spaces around `$`
-  where the neighbor is ordinary punctuation like a comma or period.
-
-R6 — Blank line before the first item of any list and after the last item of
-  any list, whenever a paragraph or heading follows.
-
-R7 — `$` parity: within each paragraph or list item, the count of unescaped
-  `$` must be even. Odd count = broken inline math. Report the line, do not
-  guess a fix unless the intended formula is unambiguous from context.
-
-R8 — `\left` and `\right` must pair within the same math span. A stray
-  `\left.` with no matching `\right` (or vice versa) breaks the whole block.
-  Fix only when the correct pairing is obvious; otherwise report.
-
-R9 — No display math inside a table cell. Convert to inline `$...$`, or move
-  the equation below the table with a reference.
-
-R10 — Inside a table cell, a literal `|` within inline math must be written
-  `\vert`, otherwise the cell splits.
-
-R11 — Escape `$` used as currency or a literal dollar sign as `\$`.
-
-R12 — Preserve all other list indentation exactly. Nested bullets that are
-  genuine content structure stay nested; only strip nesting that exists
-  solely to host display math.
-
-# DO NOT TOUCH
-These constructs render fine in practice and must be left alone unless a
-`$`-balance or `\left`/`\right` error independently proves them broken:
-  - `\mathrel{+}=` and other `\mathrel{...}` uses
-  - `\right\vert`, `\vert`, `\Vert`, `\lvert`, `\rvert`
-  - `\mathrm{...}` containing commas or hyphens, e.g. `\mathrm{conv,out}`
-  - `\stackrel{?}{=}`, `\overset`, `\underset`
-  - spacing commands `\,` `\;` `\quad` `\qquad`
-  - `\mathbf`, `\boldsymbol`, `\nabla`, `\partial`
-  - any custom macro already defined in the file's preamble
-Do not "normalize" these for style. They are not your job.
-
-# PROCEDURE
-For each target file:
-1. PRE-SCAN. Read the file and output:
-   - total line count
-   - number of `$$` blocks, and how many are indented
-   - number of ATX headings without a blank line after them
-   - number of `$`-parity violations
-   - number of unpaired `\left`/`\right`
-2. EDIT. Apply R1–R12 top to bottom in a single pass. Note the original line
-   number of every changed line.
-3. POST-SCAN. Repeat the pre-scan checks on your output. All five counters
-   must be zero. If any is non-zero, fix it before answering.
-4. DIFF-QUIT. Confirm the change set contains only lines justified by R1–R12.
-   If you touched a line for style alone, revert it.
-
-# OUTPUT FORMAT
-Provide the following for each target file, identified by its path:
-**Verdict:** one line — `RENDER-SAFE` or `FIXED (n edits)` or `PARTIAL (needs review)`.
-
-**Change log:** a table, one row per edit:
-| line | rule | before | after |
-
-**Full file:** the complete corrected Markdown in a single fenced block,
-unchanged from the source except for the logged edits.
-
-**Needs review:** only genuine ambiguities. Do not pad this list with
-constructs you already decided were fine.
-
-# VERIFICATION ONE-LINERS (for scripted use)
-    grep -nE '^[[:space:]]+\$\$' file.md     # must print nothing (R1/R2)
-    grep -c '^\$\$' file.md                  # must be even
-    grep -nE '^#{1,6} .*\S' -A1 file.md      # check blank line after headings
+Procedure:
+1. Read RULES_FILE completely. Follow every rule in it, including the detection steps and the final checklist.
+2. Read TARGET_FILE completely. Find every place that breaks a rule in RULES_FILE.
+3. Fix each place with the edit tool. Group nearby changes into one edit.
+4. Do not change any words, numbers, LaTeX content, or meaning. Do not change prose except where a rule requires it.
+5. Go through the checklist in RULES_FILE and confirm each item against TARGET_FILE. Fix any item that still fails.
+6. Edit TARGET_FILE directly. Do not print the file or the changes in the chat.
+7. Reply in one short line: the number of fixes made, and any item in RULES_FILE that could not be applied, with its location and reason.
 PROMPT
 )
 
-    printf '%s%s' "${template%%User File Path*}" "$file_path"
-    printf '%s' "${template#*User File Path}"
+    printf '%sTARGET_FILE: %s%s' \
+        "${template%%TARGET_FILE: \[put the file name here\]*}" \
+        "$target_file" \
+        "${template#*TARGET_FILE: \[put the file name here\]}"
 }
 
 make_scientific_copy_editor_prompt() {

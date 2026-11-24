@@ -24,7 +24,7 @@ def get_api_key():
     return None
 
 API_KEY = get_api_key()
-API_URL = "https://api.gapgpt.app/v1/chat/completions"
+API_URL = "https://api.gapgpt.ir/v1/chat/completions"
 MODEL_NAME = "gpt-4o-mini-2024-07-18"
 
 def refine_prompt(raw_text):

@@ -312,6 +312,41 @@ def run_window(script):
                 pass
             conn.close()
 
+        def receive_multiline(self, conn, request):
+            dialog = Gtk.Dialog(title=request.get('arguments', [])[request.get('arguments', []).index('-p') + 1]
+                                if '-p' in request.get('arguments', []) else 'Edit prompt',
+                                transient_for=self, flags=Gtk.DialogFlags.MODAL)
+            dialog.set_default_size(1000, 700)
+            dialog.set_resizable(True)
+            dialog.add_button('Cancel', Gtk.ResponseType.CANCEL)
+            dialog.add_button('OK', Gtk.ResponseType.OK)
+            content = dialog.get_content_area()
+            content.set_border_width(12)
+            view = Gtk.TextView()
+            view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+            view.set_vexpand(True)
+            view.set_hexpand(True)
+            initial = request.get('arguments', [])
+            if '-mesg' in initial:
+                buffer = view.get_buffer()
+                buffer.set_text(initial[initial.index('-mesg') + 1])
+            scroller = Gtk.ScrolledWindow()
+            scroller.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+            scroller.add(view)
+            content.add(scroller)
+            dialog.show_all()
+            response = dialog.run()
+            value = None
+            if response == Gtk.ResponseType.OK:
+                buffer = view.get_buffer()
+                value = buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter(), True)
+            dialog.destroy()
+            if value is None:
+                conn.close()
+            else:
+                self.reply(conn, value)
+            return False
+
         def receive_menu(self, conn, request):
             if self.closing or request['generation'] != str(self.generation):
                 conn.close()
@@ -330,6 +365,8 @@ def run_window(script):
             self.pending = conn
             self.request = request
             args = request['arguments']
+            if '-multiline' in args:
+                return self.receive_multiline(conn, request)
             self.title = args[args.index('-p') + 1] if '-p' in args else 'Select:'
             if os.environ.get('PICKER_DEBUG'):
                 print('MENU', index, self.title, request['items'], file=sys.stderr, flush=True)

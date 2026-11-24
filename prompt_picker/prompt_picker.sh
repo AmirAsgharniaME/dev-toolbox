@@ -140,6 +140,7 @@ CHOSEN_ACTION=""
 PIPELINE_SELECTED=0
 THEORY_GUIDE_INDEX=""
 SELECTED_THEORY_SECTIONS_BLOCK=""
+declare -A MODIFIED_PROMPTS=()
 
 make_delete_branch_message() {
     cat <<'PROMPT'
@@ -644,13 +645,31 @@ copy_and_paste_prompt() {
     fi
 
     # Keep final execution separate from navigating between stages.
-    local confirmation
-    local -a confirmation_args=(-dmenu -i -no-custom -p "Generate prompt:" -matching normal)
+    local prompt_key="$prompt" confirmation modified_prompt replacement_instruction
+    local -a confirmation_args=(-dmenu -i -no-custom -p "Prompt action:" -matching normal)
     [[ -n "$SELECTION_SUMMARY" ]] && confirmation_args+=(-summary "$SELECTION_SUMMARY")
-    if [[ "$require_confirmation" == "1" ]]; then
-        confirmation=$(printf '%s\n' "Generate prompt" | rofi "${confirmation_args[@]}") || return 1
-        [[ "$confirmation" == "Generate prompt" ]] || return 1
-    fi
+    confirmation=$(printf '%s\n' "Generate prompt" "Modify Prompt" | rofi "${confirmation_args[@]}") || return 1
+    case "$confirmation" in
+        "Generate prompt") ;;
+        "Modify Prompt")
+            modified_prompt=$(rofi -dmenu -i -multiline -p "Modify Prompt:" -mesg "$prompt" -matching normal) || return 1
+            if [[ -z "$modified_prompt" ]]; then
+                report_prompt_error "Replacement prompt is empty; nothing was copied or pasted."
+                return 1
+            fi
+            replacement_instruction=$(cat <<EOF
+Replace only the existing prompt template for the exact selected prompt "${PROMPT_IDENTITY:-currently selected prompt}" with the complete replacement text below.
+
+Replacement prompt:
+${modified_prompt}
+
+Preserve the rest of prompt_picker.sh, all other prompt templates, menu structure, behavior, paths, and arguments unchanged. Do not inspect, edit, or update any README or README.md files.
+EOF
+)
+            prompt="$replacement_instruction"
+            ;;
+        *) return 1 ;;
+    esac
 
     # Always expose the generated prompt to callers and terminal users.
     printf '%s\n' "$prompt"
@@ -961,6 +980,12 @@ show_prompt_submenu() {
     local prompt="$1"
     shift
 
+    if [[ -n "${PROMPT_CATEGORY:-}" ]]; then
+        PROMPT_IDENTITY="$PROMPT_CATEGORY > $prompt"
+    else
+        PROMPT_IDENTITY="$prompt"
+    fi
+
     printf '%s\n' "$@" |
         rofi -dmenu -i -no-custom -p "$prompt" -matching fuzzy
 }
@@ -1177,6 +1202,8 @@ show_main_project_prompts_menu() {
                 rofi -dmenu -i -no-custom -p "Prompts:" -matching fuzzy
         ) || return 0
         [[ -n "$chosen_action" ]] || return 0
+        PROMPT_CATEGORY="$chosen_action"
+        PROMPT_IDENTITY="$chosen_action"
 
         if [[ "$chosen_action" == "$AGENTS_PROMPTS_ACTION" ]]; then
             show_agents_prompts_menu

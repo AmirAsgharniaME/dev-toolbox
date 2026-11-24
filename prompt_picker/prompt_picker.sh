@@ -99,31 +99,41 @@ elif ((${#INVENTORIES[@]} > 1)); then
     FILE_PATH="${INVENTORIES[INVENTORY_INDEX]}"
 fi
 
-LIST_ACTION="2. Create/update project file list"
-AGENTS_ACTION="1. Update AGENTS.md File"
-CREATE_STATE_ACTION="3. Create STATE.md"
-AGENT_REPORT_ACTION="4. Create AGENT_REPORT.md"
-TASK_PLAN_ACTION="5. Create TASK_PLAN.md"
-EXEC_TASK_ACTION="6. Exec-Task"
-STATE_ACTION="7. Update STATE.md"
-FIX_MARKDOWN_ACTION="8. Fix Markdown"
-SCIENTIFIC_COPY_EDITOR_ACTION="9. Scientific Copy Editor"
-FIX_COMPILER_ACTION="10. Fix Compiler / Syntax Issues"
-FIX_LOGIC_ACTION="11. Fix Logic / CFD Implementation"
-REFACTOR_ACTION="12. Refactor (Clean Code & Modern C++)"
-REWRITE_ACTION="13. Rewrite from Scratch"
-SYNC_ADAPT_ACTION="14. Sync / Adapt with another file..."
+AGENTS_PROMPTS_ACTION="1. AGENTS.md"
+AGENTS_ACTION="Update"
+FILEPATH_PROMPTS_ACTION="2. FILEPATH.md"
+LIST_ACTION="Create/Update"
+STATE_PROMPTS_ACTION="3. STATE.md"
+CREATE_STATE_ACTION="Create"
+AGENT_REPORT_PROMPTS_ACTION="4. AGENT_REPORT.md"
+CREATE_AGENT_REPORT_ACTION="Create"
+TASK_PLAN_PROMPTS_ACTION="5. TASK_PLAN.md"
+CREATE_TASK_PLAN_ACTION="Create"
+EXEC_TASK_ACTION="Execute Next Phase"
+MARKDOWN_PROMPTS_ACTION="6. Markdown"
+FIX_MARKDOWN_ACTION="Fix"
+SCIENTIFIC_COPY_EDITOR_ACTION="Scientific Edit"
+STATE_ACTION="Update"
+CPP_PROMPTS_ACTION="7. C++"
+FIX_COMPILER_ACTION="Fix Compiler / Syntax Issues"
+REFACTOR_ACTION="Refactor (Clean Code & Modern C++)"
+REWRITE_ACTION="Rewrite from Scratch"
+CFD_PROMPTS_ACTION="8. CFD"
+FIX_LOGIC_ACTION="Fix Logic / CFD Implementation"
+FILE_OPERATIONS_PROMPTS_ACTION="9. File Operations"
+SYNC_ADAPT_ACTION="Sync"
+BACKUP_FILE_ACTION="Backup File"
+RESTORE_FILE_ACTION="Restore Files"
 DELETE_BRANCH_ACTION="Delete Current Branch"
 GIT_PROMPTS_ACTION="1. Git Prompts"
-MAIN_PROJECT_PROMPTS_ACTION="2. Main Project Prompts"
+MAIN_PROJECT_PROMPTS_ACTION="2. Prompts"
 THEORY_GUIDE_INDEX_ACTION="Theory Guide Sections"
-PROJECT_PIPELINE_ACTION="15. ApexFVM: The 5-Stage C++ Performance Pipeline for Project"
-CLASS_PIPELINE_ACTION="16. The 3-Stage C++ Performance Pipeline for Class"
-FUNCTION_PIPELINE_ACTION="17. The 3-Stage C++ Performance Pipeline for Function"
-BACKUP_FILE_ACTION="18. Backup File"
-RESTORE_FILE_ACTION="19. Restore File From Backup"
-THEORY_GUIDE_SECTIONS_ACTION="20. Create Theory Guide Sections"
-UPDATE_THEORY_GUIDE_SECTIONS_ACTION="21. Update Theory Guide Sections"
+PROJECT_PIPELINE_ACTION="ApexFVM: The 5-Stage C++ Performance Pipeline for Project"
+CLASS_PIPELINE_ACTION="The 3-Stage C++ Performance Pipeline for Class"
+FUNCTION_PIPELINE_ACTION="The 3-Stage C++ Performance Pipeline for Function"
+THEORY_GUIDE_PROMPTS_ACTION="10. Theory Guide Sections"
+CREATE_THEORY_GUIDE_SECTIONS_ACTION="Create"
+UPDATE_THEORY_GUIDE_SECTIONS_ACTION="Update"
 TARGET_DESC=""
 SELECTED_COUNT=0
 CHOSEN_ACTION=""
@@ -238,26 +248,22 @@ PROMPT
 
 make_theory_guide_sections_prompt() {
     cat <<'PROMPT'
-Task: Parse `Theory_Guide.md` and generate an index tracking table inside `Theory_Guide_Sections.md`.
+Task: Parse `Theory_Guide.md` and generate a clean section index in `Theory_Guide_Sections.md`.
 
 Context & Objective:
-I am developing a custom C++ CFD library and writing its comprehensive theory guide in `Theory_Guide.md`.
-To programmatically manage, prompt, and update individual sections via automation scripts, I need an organized manifest file at `Theory_Guide_Sections.md`.
+I am writing a CFD theory guide in `Theory_Guide.md`. 
+To feed section titles directly into an interactive CLI selection menu and prompt templates, I need a minimal, clean Markdown table in `Theory_Guide_Sections.md`.
 
 Instructions for the assistant:
 1. Scan `Theory_Guide.md` located in the project root.
-2. Extract all heading sections (H1, H2, H3, H4).
-3. For each section, generate a clean entry inside a structured Markdown table in `Theory_Guide_Sections.md` with the following columns:
-   - `ID`: A hierarchical numerical index (e.g., 1.0, 1.1, 1.1.1) or unique kebab-case slug.
-   - `Section Title`: The exact heading text, hyperlinked as a Markdown anchor to the original file: `[Heading Text](Theory_Guide.md#anchor-slug)`.
-   - `Heading Level`: Indicate H1, H2, H3, etc.
-   - `Status`: Set to `In Progress` or `Draft` by default unless explicitly marked complete in the section content.
+2. Extract all heading sections (H1, H2, H3, etc.).
+3. Write a clean Markdown table in `Theory_Guide_Sections.md` with only these columns:
+   - `Section Title`: The exact heading text, hyperlinked as a Markdown anchor: `[Heading Text](Theory_Guide.md#anchor-slug)`.
+   - `Level`: The heading level (e.g. H2, H3).
    - `Last Updated`: Today's date (YYYY-MM-DD).
-   - `Scope / CFD Focus`: A short 3-7 word summary of what numerical/theoretical concepts or CFD equations are covered in this section.
-4. Keep the file strictly structured and consistent so that automated Python/Bash parsing scripts can read it via regex or markdown-table parsers.
-5. If `Theory_Guide_Sections.md` already exists, update/append new sections without overwriting custom notes or prior timestamps unless the heading itself changed.
+4. Do NOT add unnecessary columns (like IDs, Status, or Scope). Keep the table simple, lightweight, and easy to parse line-by-line.
 
-Output the updated content directly to `Theory_Guide_Sections.md`.
+Output the content directly to `Theory_Guide_Sections.md`.
 PROMPT
 }
 
@@ -266,26 +272,26 @@ make_update_theory_guide_sections_prompt() {
 Task: Incrementally synchronize `Theory_Guide_Sections.md` with recent changes in `Theory_Guide.md` using Git diff.
 
 Context:
-`Theory_Guide.md` contains the comprehensive CFD theory guide.
-`Theory_Guide_Sections.md` is a Markdown table index tracking each section (ID, Title/Anchor, Level, Status, Last Updated, Scope/Notes).
+`Theory_Guide.md` contains the CFD theory guide.
+`Theory_Guide_Sections.md` is a simple 3-column table: Section Title, Level, Last Updated.
 Do NOT re-parse or rewrite the entire `Theory_Guide.md`. Only inspect changes.
 
 Instructions for the assistant:
 0. Safety & Backup Step:
-   - Before performing any modifications, make a backup copy of `Theory_Guide_Sections.md` as `Theory_Guide_Sections.md.bak` (or `Theory_Guide_Sections.bak.md`) in the same directory to prevent accidental data loss or corruption.
+   - Before modifying anything, create a backup copy of `Theory_Guide_Sections.md` as `Theory_Guide_Sections.md.bak` in the same directory.
 
-1. Run or inspect `git diff HEAD -- Theory_Guide.md` (or inspect unstaged/staged git diff if uncommitted):
-   - Check which headings (lines starting with `#`, `##`, `###`, etc.) were added, modified, renamed, or deleted.
-   - Check which existing sections had their inner content modified (even if the heading text didn't change).
+1. Inspect `git diff HEAD -- Theory_Guide.md` (or unstaged/staged diff):
+   - Identify added, renamed, or deleted headings (`#`, `##`, `###`, etc.).
+   - Identify which existing sections had internal content changes.
 
 2. Apply targeted updates to `Theory_Guide_Sections.md`:
-   - If a new heading was added: Insert a new row in the appropriate hierarchical position. Assign a matching ID, format the anchor link, set Status to `In Progress` or `Draft`, set `Last Updated` to today's date (YYYY-MM-DD), and generate a concise 3-7 word `Scope / CFD Focus`.
-   - If an existing heading was renamed/edited: Update the `Section Title` and anchor link for that row, preserving its custom notes/status, and update `Last Updated` to today's date.
-   - If a section was deleted: Remove the corresponding row from the table (or mark Status as `Archived`/`Removed`).
-   - If only the internal text/equations of an existing section were modified: Keep the row intact, but update its `Last Updated` column to today's date.
-   - If no headings or content related to a section changed: Leave that row and its previous `Last Updated` timestamp completely untouched.
+   - If a new heading was added: Insert a new row with its `Section Title` (anchor link), `Level`, and `Last Updated` set to today's date (YYYY-MM-DD).
+   - If an existing heading was renamed: Update the `Section Title` and anchor link for that row, and set `Last Updated` to today's date.
+   - If a section was deleted: Remove its row from the table.
+   - If only the content inside an existing section changed: Keep the row as-is, but update its `Last Updated` column to today's date.
+   - If a section was not touched: Leave its row and previous timestamp completely unchanged.
 
-3. Save the updated table back to `Theory_Guide_Sections.md`. Ensure Markdown table formatting remains aligned and valid.
+3. Save the updated table back to `Theory_Guide_Sections.md`. Ensure Markdown table alignment remains clean.
 PROMPT
 }
 
@@ -951,31 +957,88 @@ select_prompt_target_files() {
     fi
 }
 
-show_main_project_prompts_menu() {
+show_prompt_submenu() {
+    local prompt="$1"
+    shift
+
+    printf '%s\n' "$@" |
+        rofi -dmenu -i -no-custom -p "$prompt" -matching fuzzy
+}
+
+show_agents_prompts_menu() {
+    local chosen_action
+
+    chosen_action=$(show_prompt_submenu "AGENTS.md:" "$AGENTS_ACTION") || return 0
+    case "$chosen_action" in
+        "$AGENTS_ACTION") copy_and_paste_prompt "$(make_agents_prompt)"; return 2 ;;
+        *) return 0 ;;
+    esac
+}
+
+show_filepath_prompts_menu() {
+    local chosen_action
+
+    chosen_action=$(show_prompt_submenu "FILEPATH.md:" "$LIST_ACTION") || return 0
+    [[ "$chosen_action" == "$LIST_ACTION" ]] || return 0
+    copy_and_paste_prompt "$(make_list_prompt)"
+    return 2
+}
+
+show_state_prompts_menu() {
+    local chosen_action
+
+    chosen_action=$(show_prompt_submenu "STATE.md:" "$CREATE_STATE_ACTION" "$STATE_ACTION") || return 0
+    case "$chosen_action" in
+        "$CREATE_STATE_ACTION") copy_and_paste_prompt "$(make_create_state_prompt)"; return 2 ;;
+        "$STATE_ACTION") copy_and_paste_prompt "$(make_state_update_prompt)"; return 2 ;;
+        *) return 0 ;;
+    esac
+}
+
+show_agent_report_prompts_menu() {
+    local chosen_action
+
+    chosen_action=$(show_prompt_submenu "AGENT_REPORT.md:" "$CREATE_AGENT_REPORT_ACTION") || return 0
+    [[ "$chosen_action" == "$CREATE_AGENT_REPORT_ACTION" ]] || return 0
+    copy_and_paste_prompt "$(make_agent_report_prompt)"
+    return 2
+}
+
+show_task_plan_prompts_menu() {
+    local chosen_action
+
+    chosen_action=$(show_prompt_submenu "TASK_PLAN.md:" "$CREATE_TASK_PLAN_ACTION" "$EXEC_TASK_ACTION") || return 0
+    case "$chosen_action" in
+        "$CREATE_TASK_PLAN_ACTION") copy_and_paste_prompt "$(make_task_plan_prompt)"; return 2 ;;
+        "$EXEC_TASK_ACTION") copy_and_paste_prompt "$(make_exec_task_prompt)"; return 2 ;;
+        *) return 0 ;;
+    esac
+}
+
+show_theory_guide_sections_menu() {
+    local chosen_action
+
+    chosen_action=$(show_prompt_submenu "Theory Guide Sections:" "$CREATE_THEORY_GUIDE_SECTIONS_ACTION" "$UPDATE_THEORY_GUIDE_SECTIONS_ACTION") || return 0
+    case "$chosen_action" in
+        "$CREATE_THEORY_GUIDE_SECTIONS_ACTION") copy_and_paste_prompt "$(make_theory_guide_sections_prompt)"; return 2 ;;
+        "$UPDATE_THEORY_GUIDE_SECTIONS_ACTION") copy_and_paste_prompt "$(make_update_theory_guide_sections_prompt)"; return 2 ;;
+        *) return 0 ;;
+    esac
+}
+
+show_markdown_prompts_menu() {
     local chosen_action
     local file_path
 
-    chosen_action=$(
-        printf '%s\n' "$AGENTS_ACTION" "$LIST_ACTION" "$CREATE_STATE_ACTION" "$AGENT_REPORT_ACTION" "$TASK_PLAN_ACTION" "$EXEC_TASK_ACTION" "$STATE_ACTION" "$FIX_MARKDOWN_ACTION" "$SCIENTIFIC_COPY_EDITOR_ACTION" "$FIX_COMPILER_ACTION" "$FIX_LOGIC_ACTION" "$REFACTOR_ACTION" "$REWRITE_ACTION" "$SYNC_ADAPT_ACTION" "$PROJECT_PIPELINE_ACTION" "$CLASS_PIPELINE_ACTION" "$FUNCTION_PIPELINE_ACTION" "$BACKUP_FILE_ACTION" "$RESTORE_FILE_ACTION" "$THEORY_GUIDE_SECTIONS_ACTION" "$UPDATE_THEORY_GUIDE_SECTIONS_ACTION" |
-            rofi -dmenu -i -no-custom -p "Main Project Prompts:" -matching fuzzy
-    )
-
+    chosen_action=$(show_prompt_submenu "Markdown:" "$FIX_MARKDOWN_ACTION" "$SCIENTIFIC_COPY_EDITOR_ACTION") || return 0
     case "$chosen_action" in
-        "$LIST_ACTION") copy_and_paste_prompt "$(make_list_prompt)" ;;
-        "$AGENTS_ACTION") copy_and_paste_prompt "$(make_agents_prompt)" ;;
-        "$CREATE_STATE_ACTION") copy_and_paste_prompt "$(make_create_state_prompt)" ;;
-        "$THEORY_GUIDE_SECTIONS_ACTION") copy_and_paste_prompt "$(make_theory_guide_sections_prompt)" ;;
-        "$UPDATE_THEORY_GUIDE_SECTIONS_ACTION") copy_and_paste_prompt "$(make_update_theory_guide_sections_prompt)" ;;
-        "$AGENT_REPORT_ACTION") copy_and_paste_prompt "$(make_agent_report_prompt)" ;;
-        "$TASK_PLAN_ACTION") copy_and_paste_prompt "$(make_task_plan_prompt)" ;;
-        "$EXEC_TASK_ACTION") copy_and_paste_prompt "$(make_exec_task_prompt)" ;;
-        "$STATE_ACTION") copy_and_paste_prompt "$(make_state_update_prompt)" ;;
         "$FIX_MARKDOWN_ACTION")
             select_prompt_target_files || return 0
             file_path="$SELECTED_TARGET_FILES"
             SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
             [[ -z "$SELECTED_THEORY_SECTIONS_BLOCK" ]] || SELECTION_SUMMARY+="; Theory Guide Sections selected"
             copy_and_paste_prompt "$(make_fix_markdown_prompt "$file_path")"
+            return 2
             ;;
         "$SCIENTIFIC_COPY_EDITOR_ACTION")
             select_prompt_target_files || return 0
@@ -983,20 +1046,25 @@ show_main_project_prompts_menu() {
             SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
             [[ -z "$SELECTED_THEORY_SECTIONS_BLOCK" ]] || SELECTION_SUMMARY+="; Theory Guide Sections selected"
             copy_and_paste_prompt "$(make_scientific_copy_editor_prompt "$file_path")"
+            return 2
             ;;
+        *) return 0 ;;
+    esac
+}
+
+show_cpp_prompts_menu() {
+    local chosen_action
+    local file_path
+
+    chosen_action=$(show_prompt_submenu "C++:" "$FIX_COMPILER_ACTION" "$REFACTOR_ACTION" "$REWRITE_ACTION" "$CLASS_PIPELINE_ACTION" "$FUNCTION_PIPELINE_ACTION") || return 0
+    case "$chosen_action" in
         "$FIX_COMPILER_ACTION")
             select_prompt_target_files || return 0
             file_path="$SELECTED_TARGET_FILES"
             SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
             [[ -z "$SELECTED_THEORY_SECTIONS_BLOCK" ]] || SELECTION_SUMMARY+="; Theory Guide Sections selected"
             copy_and_paste_prompt "$(make_fix_compiler_prompt "$file_path")"
-            ;;
-        "$FIX_LOGIC_ACTION")
-            select_prompt_target_files || return 0
-            file_path="$SELECTED_TARGET_FILES"
-            SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
-            [[ -z "$SELECTED_THEORY_SECTIONS_BLOCK" ]] || SELECTION_SUMMARY+="; Theory Guide Sections selected"
-            copy_and_paste_prompt "$(make_fix_logic_prompt "$file_path")"
+            return 2
             ;;
         "$REFACTOR_ACTION")
             select_prompt_target_files || return 0
@@ -1004,6 +1072,7 @@ show_main_project_prompts_menu() {
             SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
             [[ -z "$SELECTED_THEORY_SECTIONS_BLOCK" ]] || SELECTION_SUMMARY+="; Theory Guide Sections selected"
             copy_and_paste_prompt "$(make_refactor_prompt "$file_path")"
+            return 2
             ;;
         "$REWRITE_ACTION")
             select_prompt_target_files || return 0
@@ -1011,7 +1080,64 @@ show_main_project_prompts_menu() {
             SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
             [[ -z "$SELECTED_THEORY_SECTIONS_BLOCK" ]] || SELECTION_SUMMARY+="; Theory Guide Sections selected"
             copy_and_paste_prompt "$(make_rewrite_prompt "$file_path")"
+            return 2
             ;;
+        "$CLASS_PIPELINE_ACTION"|"$FUNCTION_PIPELINE_ACTION")
+            select_prompt_target_files || return 0
+            file_path="$SELECTED_TARGET_FILES"
+            SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
+            CHOSEN_ACTION="$chosen_action"
+            TARGET_DESC="$file_path"
+            SELECTED_COUNT=1
+            while [[ "$file_path" == *" And "* ]]; do
+                ((SELECTED_COUNT += 1))
+                file_path="${file_path#* And }"
+            done
+            PIPELINE_SELECTED=1
+            return 2
+            ;;
+        *) return 0 ;;
+    esac
+}
+
+show_cfd_prompts_menu() {
+    local chosen_action
+    local file_path
+
+    chosen_action=$(show_prompt_submenu "CFD:" "$FIX_LOGIC_ACTION" "$PROJECT_PIPELINE_ACTION") || return 0
+    case "$chosen_action" in
+        "$FIX_LOGIC_ACTION")
+            select_prompt_target_files || return 0
+            file_path="$SELECTED_TARGET_FILES"
+            SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
+            [[ -z "$SELECTED_THEORY_SECTIONS_BLOCK" ]] || SELECTION_SUMMARY+="; Theory Guide Sections selected"
+            copy_and_paste_prompt "$(make_fix_logic_prompt "$file_path")"
+            return 2
+            ;;
+        "$PROJECT_PIPELINE_ACTION")
+            select_prompt_target_files || return 0
+            file_path="$SELECTED_TARGET_FILES"
+            SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
+            CHOSEN_ACTION="$chosen_action"
+            TARGET_DESC="$file_path"
+            SELECTED_COUNT=1
+            while [[ "$file_path" == *" And "* ]]; do
+                ((SELECTED_COUNT += 1))
+                file_path="${file_path#* And }"
+            done
+            PIPELINE_SELECTED=1
+            return 2
+            ;;
+        *) return 0 ;;
+    esac
+}
+
+show_file_operations_menu() {
+    local chosen_action
+    local file_path
+
+    chosen_action=$(show_prompt_submenu "File Operations:" "$SYNC_ADAPT_ACTION" "$BACKUP_FILE_ACTION" "$RESTORE_FILE_ACTION") || return 0
+    case "$chosen_action" in
         "$SYNC_ADAPT_ACTION")
             local source_paths
             SELECTION_SUMMARY=""; SELECTION_GROUP_COUNT=2; SELECTION_GROUP_INDEX=1
@@ -1037,20 +1163,83 @@ show_main_project_prompts_menu() {
             [[ -z "$SELECTED_THEORY_SECTIONS_BLOCK" ]] || SELECTION_SUMMARY+="; Theory Guide Sections selected"
             copy_and_paste_prompt "$(make_restore_file_prompt "$file_path")"
             ;;
-        "$PROJECT_PIPELINE_ACTION"|"$CLASS_PIPELINE_ACTION"|"$FUNCTION_PIPELINE_ACTION")
-            select_prompt_target_files || return 0
-            file_path="$SELECTED_TARGET_FILES"
-            SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
-            CHOSEN_ACTION="$chosen_action"
-            TARGET_DESC="$file_path"
-            SELECTED_COUNT=1
-            while [[ "$file_path" == *" And "* ]]; do
-                ((SELECTED_COUNT += 1))
-                file_path="${file_path#* And }"
-            done
-            PIPELINE_SELECTED=1
-            ;;
     esac
+    return 2
+}
+
+show_main_project_prompts_menu() {
+    local chosen_action
+    local file_path
+
+    while true; do
+        chosen_action=$(
+            printf '%s\n' "$AGENTS_PROMPTS_ACTION" "$FILEPATH_PROMPTS_ACTION" "$STATE_PROMPTS_ACTION" "$AGENT_REPORT_PROMPTS_ACTION" "$TASK_PLAN_PROMPTS_ACTION" "$MARKDOWN_PROMPTS_ACTION" "$CPP_PROMPTS_ACTION" "$CFD_PROMPTS_ACTION" "$FILE_OPERATIONS_PROMPTS_ACTION" "$THEORY_GUIDE_PROMPTS_ACTION" |
+                rofi -dmenu -i -no-custom -p "Prompts:" -matching fuzzy
+        ) || return 0
+        [[ -n "$chosen_action" ]] || return 0
+
+        if [[ "$chosen_action" == "$AGENTS_PROMPTS_ACTION" ]]; then
+            show_agents_prompts_menu
+            [[ "$?" -eq 2 ]] && return 0
+            continue
+        fi
+
+        if [[ "$chosen_action" == "$FILEPATH_PROMPTS_ACTION" ]]; then
+            show_filepath_prompts_menu
+            [[ "$?" -eq 2 ]] && return 0
+            continue
+        fi
+
+        if [[ "$chosen_action" == "$STATE_PROMPTS_ACTION" ]]; then
+            show_state_prompts_menu
+            [[ "$?" -eq 2 ]] && return 0
+            continue
+        fi
+
+        if [[ "$chosen_action" == "$AGENT_REPORT_PROMPTS_ACTION" ]]; then
+            show_agent_report_prompts_menu
+            [[ "$?" -eq 2 ]] && return 0
+            continue
+        fi
+
+        if [[ "$chosen_action" == "$TASK_PLAN_PROMPTS_ACTION" ]]; then
+            show_task_plan_prompts_menu
+            [[ "$?" -eq 2 ]] && return 0
+            continue
+        fi
+
+        if [[ "$chosen_action" == "$MARKDOWN_PROMPTS_ACTION" ]]; then
+            show_markdown_prompts_menu
+            [[ "$?" -eq 2 ]] && return 0
+            continue
+        fi
+
+        if [[ "$chosen_action" == "$CPP_PROMPTS_ACTION" ]]; then
+            show_cpp_prompts_menu
+            [[ "$?" -eq 2 ]] && return 0
+            continue
+        fi
+
+        if [[ "$chosen_action" == "$CFD_PROMPTS_ACTION" ]]; then
+            show_cfd_prompts_menu
+            [[ "$?" -eq 2 ]] && return 0
+            continue
+        fi
+
+        if [[ "$chosen_action" == "$FILE_OPERATIONS_PROMPTS_ACTION" ]]; then
+            show_file_operations_menu
+            [[ "$?" -eq 2 ]] && return 0
+            continue
+        fi
+
+        if [[ "$chosen_action" == "$THEORY_GUIDE_PROMPTS_ACTION" ]]; then
+            show_theory_guide_sections_menu
+            [[ "$?" -eq 2 ]] && return 0
+            continue
+        fi
+
+        return 0
+    done
 }
 
 # Generate a standard path description based on TYPE and LABEL.
@@ -1269,7 +1458,7 @@ select_root_files() {
 }
 
 # The initial mixed menu uses the shared multi-selection controller for file
-# rows while Git and Main Project Prompts remain ordinary single-choice rows.
+# rows while Git and Prompts remain ordinary single-choice rows.
 SELECTED_LINES=$(select_root_files) || exit 0
 [[ -n "$SELECTED_LINES" ]] || exit 0
 if [[ "$SELECTED_LINES" == "$GIT_PROMPTS_ACTION" ]]; then

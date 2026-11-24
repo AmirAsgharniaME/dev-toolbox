@@ -6,7 +6,7 @@ A small collection of Linux desktop helpers for building coding prompts and poli
 
 | Utility | What it does | Start here |
 | --- | --- | --- |
-| **Prompt Picker** | Uses a project's `FILEPATH.md` to build file-specific coding prompts, backup and restore prompts, project maintenance and Git prompts, and prompts targeted at headings indexed in `Theory_Guide_Sections.md`. Copies the prompt to the clipboard and can paste it into the previously active window. | [`prompt_picker/README.md`](prompt_picker/README.md) |
+| **Prompt Picker** | Uses a project's `FILEPATH.md` to build file-specific coding prompts, backup and restore prompts, project maintenance and Git prompts, and prompts targeted at headings indexed in `Theory_Guide_Sections.md`. Its **Prompts** menu groups actions by document, Markdown, C++, CFD, file operations, and theory guide sections. Copies the prompt to the clipboard and can paste it into the previously active window. | [`prompt_picker/README.md`](prompt_picker/README.md) |
 | **Prompt Helper** | Opens an editable dialog, refines the text through the GapGPT API, then copies and pastes the result. | [`prompt_helper/README.md`](prompt_helper/README.md) |
 | **Translator** | Translates Persian or mixed text into polished academic English, or improves English text. The launcher reads clipboard text; the Python script also accepts an argument, piped input, or the X11 primary selection. | [`translator/README.md`](translator/README.md) |
 
@@ -21,6 +21,8 @@ bash translator/run_translator.sh
 ```
 
 Prompt Picker discovers inventories in its launch directory and the active window’s process tree. When it finds multiple inventories, choose one in a window that can be minimized and restored; see its guide for controls, discovery limits, and shortcut details.
+
+The picker’s initial menu offers the inventory entries, **Git Prompts**, and **Prompts**. The Prompts menu starts with **AGENTS.md**, **FILEPATH.md**, and **STATE.md** submenus, followed by report and task-plan prompts and grouped Markdown, C++, CFD, file-operation, and theory-guide actions. Canceling a submenu returns to **Prompts** without generating a prompt. File-targeted actions let you select multiple paths; theory-guide sections are offered when both the guide and its section index are available.
 
 The desktop flows are designed for Linux with an X11 session. See each utility's README for its required packages, clipboard and paste behavior, and setup details.
 

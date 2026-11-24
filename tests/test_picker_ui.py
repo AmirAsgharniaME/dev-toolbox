@@ -263,12 +263,14 @@ class TheoryTargetFlowTests(unittest.TestCase):
                         if title == 'Select project inventory:':
                             answer = '0'
                         elif title == 'Select File or Action:':
-                            answer = '2. Main Project Prompts'
+                            answer = '2. Prompts'
                         elif title == 'Select target type:':
                             answer = 'Theory Guide Sections' if target in ('theory', 'multiple') else 'FILEPATH.md files'
                         elif title == 'Select section(s) or Done:':
                             answer = '\n'.join(request['items']) if target == 'multiple' else request['items'][0]
-                        elif title == 'Main Project Prompts:':
+                        elif title == 'Prompts:':
+                            answer = action
+                        elif title == 'STATE.md:':
                             answer = action
                         elif title == 'Select target file or Done:':
                             answer = 'CPP | Solver | solver.cpp'
@@ -299,7 +301,7 @@ class TheoryTargetFlowTests(unittest.TestCase):
         requests, output = self.run_flow(True, 'theory')
         titles = [request['arguments'][request['arguments'].index('-p') + 1] for request in requests]
         self.assertEqual(titles, ['Select project inventory:', 'Select File or Action:',
-                                  'Main Project Prompts:', 'Select target type:', 'Select section(s) or Done:',
+                                  'Prompts:', 'Select target type:', 'Select section(s) or Done:',
                                   'Generate prompt:'])
         self.assertNotIn('Theory Guide Sections', requests[1]['items'])
         self.assertFalse(any('Transport' in item for item in requests[1]['items']))
@@ -396,13 +398,13 @@ class PromptOutputTests(unittest.TestCase):
                         args = request['arguments']
                         title = args[args.index('-p') + 1] if '-p' in args else ''
                         if title == 'No file list found:':
-                            answer = '2. Main Project Prompts'
+                            answer = '2. Prompts'
                         elif title == 'Select File or Action:':
                             answer = ('\n'.join(root_files) if root_files is not None
-                                      else '2. Main Project Prompts')
+                                      else '2. Prompts')
                         elif title == 'Action for target:':
                             answer = action
-                        elif title == 'Main Project Prompts:':
+                        elif title == 'Prompts:':
                             answer = action
                         elif title.startswith('Select target file or Done:'):
                             answer = '\n'.join(groups[group_number])
@@ -456,7 +458,7 @@ class PromptOutputTests(unittest.TestCase):
             return process.stdout
 
     def test_no_file_prompt_is_printed(self):
-        output = self.run_prompt('3. Create STATE.md', with_inventory=False)
+        output = self.run_prompt('Create', with_inventory=False)
         self.assertIn('STATE.md', output)
         self.assertIn('current status', output)
 
@@ -491,7 +493,7 @@ class PromptOutputTests(unittest.TestCase):
                       output)
 
     def test_clipboard_failure_still_prints_prompt_and_reports_error(self):
-        output = self.run_prompt('3. Create STATE.md', with_inventory=False,
+        output = self.run_prompt('Create', with_inventory=False,
                                  clipboard_fails=True, expected_return=1,
                                  expected_error='Could not copy the prompt to the clipboard.')
         self.assertIn('STATE.md', output)

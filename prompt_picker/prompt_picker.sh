@@ -116,6 +116,7 @@ SYNC_ADAPT_ACTION="14. Sync / Adapt with another file..."
 DELETE_BRANCH_ACTION="Delete Current Branch"
 GIT_PROMPTS_ACTION="1. Git Prompts"
 MAIN_PROJECT_PROMPTS_ACTION="2. Main Project Prompts"
+THEORY_GUIDE_INDEX_ACTION="Theory Guide Sections"
 PROJECT_PIPELINE_ACTION="15. ApexFVM: The 5-Stage C++ Performance Pipeline for Project"
 CLASS_PIPELINE_ACTION="16. The 3-Stage C++ Performance Pipeline for Class"
 FUNCTION_PIPELINE_ACTION="17. The 3-Stage C++ Performance Pipeline for Function"
@@ -127,6 +128,8 @@ TARGET_DESC=""
 SELECTED_COUNT=0
 CHOSEN_ACTION=""
 PIPELINE_SELECTED=0
+THEORY_GUIDE_INDEX=""
+SELECTED_THEORY_SECTIONS_BLOCK=""
 
 make_delete_branch_message() {
     cat <<'PROMPT'
@@ -625,6 +628,10 @@ copy_and_paste_prompt() {
     local window_class="" paste_key="shift+Insert" clipboard_tool clipboard_text
     local primary_ok=0 focused_win=""
 
+    if [[ -n "$SELECTED_THEORY_SECTIONS_BLOCK" ]]; then
+        prompt+=$'\n\n'"$SELECTED_THEORY_SECTIONS_BLOCK"
+    fi
+
     if [[ -z "$prompt" ]]; then
         report_prompt_error "Generated prompt is empty; nothing was copied or pasted."
         return 1
@@ -732,6 +739,160 @@ copy_and_paste_prompt() {
     fi
 }
 
+load_theory_guide_sections() {
+    local index_file="$1" line_number=0
+    THEORY_SECTION_TITLES=()
+    THEORY_SECTION_LEVELS=()
+    THEORY_SECTION_SOURCES=()
+    THEORY_SECTION_MENU=()
+
+    while IFS=$'\t' read -r line_number title level source display; do
+        [[ -n "$title" ]] || continue
+        THEORY_SECTION_TITLES+=("$title")
+        THEORY_SECTION_LEVELS+=("$level")
+        THEORY_SECTION_SOURCES+=("$source")
+        THEORY_SECTION_MENU+=("$display")
+    done < <(python3 - "$index_file" <<'PY'
+import re
+import sys
+
+path = sys.argv[1]
+try:
+    with open(path, encoding="utf-8") as stream:
+        lines = stream.readlines()
+except OSError as error:
+    print(f"Could not read {path}: {error}", file=sys.stderr)
+    raise SystemExit(2)
+
+header_index = None
+columns = None
+for index, raw in enumerate(lines):
+    stripped = raw.strip()
+    if not stripped.startswith("|"):
+        continue
+    cells = [cell.strip() for cell in stripped.strip("|").split("|")]
+    if cells and cells[0].casefold() == "section title":
+        header_index, columns = index, cells
+        break
+
+if header_index is None or "level" not in [cell.casefold() for cell in columns]:
+    print(f"Malformed Theory Guide index: {path} has no Section Title/Level table header.", file=sys.stderr)
+    raise SystemExit(2)
+
+title_column = next(i for i, cell in enumerate(columns) if cell.casefold() == "section title")
+level_column = next(i for i, cell in enumerate(columns) if cell.casefold() == "level")
+rows = []
+for number, raw in enumerate(lines[header_index + 1:], header_index + 2):
+    stripped = raw.strip()
+    if not stripped.startswith("|"):
+        if rows:
+            break
+        continue
+    cells = [cell.strip() for cell in stripped.strip("|").split("|")]
+    if all(re.fullmatch(r":?-{3,}:?", cell) for cell in cells):
+        continue
+    if len(cells) <= max(title_column, level_column):
+        print(f"Malformed Theory Guide index row {number}: missing required columns.", file=sys.stderr)
+        raise SystemExit(2)
+    if cells[0].casefold() == "section title":
+        continue
+    match = re.fullmatch(r"\[([^\]]+)\]\(([^)]+)\)", cells[title_column])
+    level = cells[level_column]
+    if not match or not re.fullmatch(r"H[1-6]", level):
+        print(f"Malformed Theory Guide index row {number}: expected a linked title and heading level.", file=sys.stderr)
+        raise SystemExit(2)
+    title, source = match.groups()
+    if not source.startswith("Theory_Guide.md#"):
+        print(f"Malformed Theory Guide index row {number}: source must point into Theory_Guide.md.", file=sys.stderr)
+        raise SystemExit(2)
+    indent = "  " * (int(level[1]) - 2 if int(level[1]) > 2 else 0)
+    display = f"{indent}{level}  {title}  [{source.split('#', 1)[1]}]"
+    rows.append((number, title, level, source, display))
+
+if not rows:
+    print(f"Malformed Theory Guide index: {path} contains no section rows.", file=sys.stderr)
+    raise SystemExit(2)
+
+for row in rows:
+    print("\t".join(map(str, row)))
+PY
+    ) || return 1
+    ((${#THEORY_SECTION_TITLES[@]} > 0))
+}
+
+make_theory_sections_block() {
+    local selected_sections="$1"
+    local selected_line selected_index first=1 content block='Selected target section(s) in `Theory_Guide.md`:'
+    while IFS= read -r selected_line; do
+        [[ -n "$selected_line" ]] || continue
+        for selected_index in "${!THEORY_SECTION_MENU[@]}"; do
+            if [[ "${THEORY_SECTION_MENU[selected_index]}" == "$selected_line" ]]; then
+                ((first)) || block+=$'\n'
+                block+=$'\n- Heading: `'"${THEORY_SECTION_TITLES[selected_index]}"'`'
+                block+=$'\n  Level: `'"${THEORY_SECTION_LEVELS[selected_index]}"'`'
+                block+=$'\n  Source: `'"${THEORY_SECTION_SOURCES[selected_index]}"'`'
+                content=$(python3 - "$(dirname -- "$THEORY_GUIDE_INDEX")/Theory_Guide.md" "${THEORY_SECTION_TITLES[selected_index]}" "${THEORY_SECTION_LEVELS[selected_index]}" "${THEORY_SECTION_SOURCES[selected_index]#*#}" <<'PY'
+import re
+import sys
+
+path, title, level, anchor = sys.argv[1:]
+with open(path, encoding="utf-8") as stream:
+    lines = stream.readlines()
+headings = []
+counts = {}
+fence = None
+for index, line in enumerate(lines):
+    marker = re.match(r"^ {0,3}(`{3,}|~{3,})", line)
+    if marker:
+        token = marker.group(1)
+        if fence is None:
+            fence = token
+        elif token[0] == fence[0] and len(token) >= len(fence):
+            fence = None
+        continue
+    if fence:
+        continue
+    match = re.match(r"^ {0,3}(#{1,6})\s+(.+?)\s*#*\s*$", line)
+    if not match:
+        continue
+    heading = match.group(2)
+    slug = re.sub(r"[^\w\- ]", "", heading.lower()).replace(" ", "-")
+    count = counts.get(slug, 0)
+    counts[slug] = count + 1
+    headings.append((index, len(match.group(1)), heading, slug + (f"-{count}" if count else "")))
+for position, (start, depth, heading, slug) in enumerate(headings):
+    if heading == title and depth == int(level[1]) and slug == anchor:
+        end = next((item[0] for item in headings[position + 1:] if item[1] <= depth), len(lines))
+        print("".join(lines[start:end]).rstrip())
+        break
+else:
+    print(f"Could not find section {title!r} ({anchor}) in {path}.", file=sys.stderr)
+    raise SystemExit(1)
+PY
+                ) || return 1
+                block+=$'\n  Content:\n\n'"$content"$'\n'
+                first=0
+                break
+            fi
+        done
+    done <<< "$selected_sections"
+    block+=$'\n\nInstruction:\nApply the selected prompt to the exact section(s) listed above. Read their current content from `Theory_Guide.md`; `Theory_Guide_Sections.md` is only an index. Do not modify unrelated sections.'
+    printf '%s' "$block"
+}
+
+select_theory_guide_sections() {
+    local selected_sections
+    load_theory_guide_sections "$THEORY_GUIDE_INDEX" || {
+        report_prompt_error "Could not load sections from $THEORY_GUIDE_INDEX. Fix the malformed index rows and try again."
+        return 1
+    }
+    selected_sections=$(printf '%s\n' "${THEORY_SECTION_MENU[@]}" |
+        rofi -dmenu -i -no-custom -multi-select -group "Theory Guide sections" -p "Select section(s) or Done:" -matching normal) || return 1
+    [[ -n "$selected_sections" ]] || return 1
+    SELECTED_THEORY_SECTIONS_BLOCK=$(make_theory_sections_block "$selected_sections") || return 1
+    [[ -n "$SELECTED_THEORY_SECTIONS_BLOCK" ]]
+}
+
 show_delete_branch_message() {
     local message
     message=$(make_delete_branch_message)
@@ -744,6 +905,21 @@ select_prompt_target_files() {
     local targets="" raw_selection group_label
     local selection_prompt="Select ${selection_role} file or Done:"
     local manual_prompt="Enter ${selection_role} file path or choose Done:"
+
+    if [[ "$selection_role" == "target" && -n "$THEORY_GUIDE_INDEX" ]]; then
+        local target_kind
+        target_kind=$(printf '%s\n' "FILEPATH.md files" "$THEORY_GUIDE_INDEX_ACTION" |
+            rofi -dmenu -i -no-custom -p "Select target type:" -matching normal) || return 1
+        case "$target_kind" in
+            "$THEORY_GUIDE_INDEX_ACTION")
+                select_theory_guide_sections || return 1
+                SELECTED_TARGET_FILES="Theory_Guide.md"
+                return 0
+                ;;
+            "FILEPATH.md files") ;;
+            *) return 1 ;;
+        esac
+    fi
 
     group_label="$selection_role (Group ${SELECTION_GROUP_INDEX:-1} of ${SELECTION_GROUP_COUNT:-1})"
 
@@ -769,7 +945,10 @@ select_prompt_target_files() {
     fi
 
     [[ -n "$targets" ]] || return 1
-    printf '%s' "$targets"
+    SELECTED_TARGET_FILES="$targets"
+    if [[ "$selection_role" == "remove" ]]; then
+        printf '%s' "$targets"
+    fi
 }
 
 show_main_project_prompts_menu() {
@@ -792,56 +971,75 @@ show_main_project_prompts_menu() {
         "$EXEC_TASK_ACTION") copy_and_paste_prompt "$(make_exec_task_prompt)" ;;
         "$STATE_ACTION") copy_and_paste_prompt "$(make_state_update_prompt)" ;;
         "$FIX_MARKDOWN_ACTION")
-            file_path=$(select_prompt_target_files) || return 0
+            select_prompt_target_files || return 0
+            file_path="$SELECTED_TARGET_FILES"
             SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
+            [[ -z "$SELECTED_THEORY_SECTIONS_BLOCK" ]] || SELECTION_SUMMARY+="; Theory Guide Sections selected"
             copy_and_paste_prompt "$(make_fix_markdown_prompt "$file_path")"
             ;;
         "$SCIENTIFIC_COPY_EDITOR_ACTION")
-            file_path=$(select_prompt_target_files) || return 0
+            select_prompt_target_files || return 0
+            file_path="$SELECTED_TARGET_FILES"
             SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
+            [[ -z "$SELECTED_THEORY_SECTIONS_BLOCK" ]] || SELECTION_SUMMARY+="; Theory Guide Sections selected"
             copy_and_paste_prompt "$(make_scientific_copy_editor_prompt "$file_path")"
             ;;
         "$FIX_COMPILER_ACTION")
-            file_path=$(select_prompt_target_files) || return 0
+            select_prompt_target_files || return 0
+            file_path="$SELECTED_TARGET_FILES"
             SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
+            [[ -z "$SELECTED_THEORY_SECTIONS_BLOCK" ]] || SELECTION_SUMMARY+="; Theory Guide Sections selected"
             copy_and_paste_prompt "$(make_fix_compiler_prompt "$file_path")"
             ;;
         "$FIX_LOGIC_ACTION")
-            file_path=$(select_prompt_target_files) || return 0
+            select_prompt_target_files || return 0
+            file_path="$SELECTED_TARGET_FILES"
             SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
+            [[ -z "$SELECTED_THEORY_SECTIONS_BLOCK" ]] || SELECTION_SUMMARY+="; Theory Guide Sections selected"
             copy_and_paste_prompt "$(make_fix_logic_prompt "$file_path")"
             ;;
         "$REFACTOR_ACTION")
-            file_path=$(select_prompt_target_files) || return 0
+            select_prompt_target_files || return 0
+            file_path="$SELECTED_TARGET_FILES"
             SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
+            [[ -z "$SELECTED_THEORY_SECTIONS_BLOCK" ]] || SELECTION_SUMMARY+="; Theory Guide Sections selected"
             copy_and_paste_prompt "$(make_refactor_prompt "$file_path")"
             ;;
         "$REWRITE_ACTION")
-            file_path=$(select_prompt_target_files) || return 0
+            select_prompt_target_files || return 0
+            file_path="$SELECTED_TARGET_FILES"
             SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
+            [[ -z "$SELECTED_THEORY_SECTIONS_BLOCK" ]] || SELECTION_SUMMARY+="; Theory Guide Sections selected"
             copy_and_paste_prompt "$(make_rewrite_prompt "$file_path")"
             ;;
         "$SYNC_ADAPT_ACTION")
             local source_paths
             SELECTION_SUMMARY=""; SELECTION_GROUP_COUNT=2; SELECTION_GROUP_INDEX=1
-            file_path=$(select_prompt_target_files "target") || return 0
+            select_prompt_target_files "target" || return 0
+            file_path="$SELECTED_TARGET_FILES"
             SELECTION_GROUP_INDEX=2
-            source_paths=$(select_prompt_target_files "source") || return 0
+            select_prompt_target_files "source" || return 0
+            source_paths="$SELECTED_TARGET_FILES"
             SELECTION_SUMMARY="target (Group 1 of 2): $file_path; source (Group 2 of 2): $source_paths"
             copy_and_paste_prompt "Please update and sync $file_path based on the interface and changes introduced in $source_paths."
             ;;
         "$BACKUP_FILE_ACTION")
-            file_path=$(select_prompt_target_files) || return 0
+            select_prompt_target_files || return 0
+            file_path="$SELECTED_TARGET_FILES"
             SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
+            [[ -z "$SELECTED_THEORY_SECTIONS_BLOCK" ]] || SELECTION_SUMMARY+="; Theory Guide Sections selected"
             copy_and_paste_prompt "$(make_backup_file_prompt "$file_path")"
             ;;
         "$RESTORE_FILE_ACTION")
-            file_path=$(select_prompt_target_files) || return 0
+            select_prompt_target_files || return 0
+            file_path="$SELECTED_TARGET_FILES"
             SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
+            [[ -z "$SELECTED_THEORY_SECTIONS_BLOCK" ]] || SELECTION_SUMMARY+="; Theory Guide Sections selected"
             copy_and_paste_prompt "$(make_restore_file_prompt "$file_path")"
             ;;
         "$PROJECT_PIPELINE_ACTION"|"$CLASS_PIPELINE_ACTION"|"$FUNCTION_PIPELINE_ACTION")
-            file_path=$(select_prompt_target_files) || return 0
+            select_prompt_target_files || return 0
+            file_path="$SELECTED_TARGET_FILES"
             SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
             CHOSEN_ACTION="$chosen_action"
             TARGET_DESC="$file_path"
@@ -1046,6 +1244,11 @@ if [[ -z "$FILE_PATH" ]]; then
     [[ "$PIPELINE_SELECTED" -eq 1 ]] || exit 0
 fi
 
+if [[ -n "$FILE_PATH" ]]; then
+    THEORY_GUIDE_INDEX="$(dirname -- "$FILE_PATH")/Theory_Guide_Sections.md"
+    [[ -f "$THEORY_GUIDE_INDEX" && -f "$(dirname -- "$FILE_PATH")/Theory_Guide.md" ]] || THEORY_GUIDE_INDEX=""
+fi
+
 # Normalize the file list once and reuse the same snapshot in every menu.
 # A new invocation reloads the list after project-list updates.
 if [[ -n "$FILE_PATH" ]]; then
@@ -1055,7 +1258,6 @@ else
 fi
 select_root_files() {
     local -a items=()
-
     items+=("$GIT_PROMPTS_ACTION" "$MAIN_PROJECT_PROMPTS_ACTION")
     while IFS= read -r line; do
         [[ -n "$line" ]] && items+=("$line")

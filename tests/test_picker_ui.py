@@ -212,6 +212,133 @@ class PickerHistoryTests(unittest.TestCase):
                          'Select at least 1 file.')
 
 
+class TheoryTargetFlowTests(unittest.TestCase):
+    def run_flow(self, with_index, target, with_guide=True, action='8. Fix Markdown'):
+        script = Path(__file__).resolve().parents[1] / 'prompt_picker' / 'prompt_picker.sh'
+        with tempfile.TemporaryDirectory(prefix='picker-theory-flow-') as tmp:
+            root = Path(tmp)
+            project = root / 'project'
+            tool = root / 'tool'
+            bindir = root / 'bin'
+            project.mkdir()
+            tool.mkdir()
+            bindir.mkdir()
+            (project / 'FILEPATH.md').write_text('CPP | Solver | solver.cpp\n')
+            (tool / 'FILEPATH.md').write_text('MD | Other | other.md\n')
+            if with_index:
+                (project / 'Theory_Guide_Sections.md').write_text(
+                    '| Section Title | Level | Last Updated |\n'
+                    '| :--- | :---: | :---: |\n'
+                    '| [Transport](Theory_Guide.md#transport) | H2 | 2026-01-01 |\n'
+                    '| [Other](Theory_Guide.md#other) | H2 | 2026-01-01 |\n')
+            if with_guide:
+                (project / 'Theory_Guide.md').write_text('## Transport\n\nSection body.\n\n## Other\n\nUnrelated.\n')
+            shutil.copyfile(script, tool / 'prompt_picker.sh')
+            shutil.copyfile(script.with_name('picker_ui.py'), tool / 'picker_ui.py')
+            clipboard = bindir / 'xclip'
+            clipboard.write_text('#!/bin/sh\ncat >/dev/null\n')
+            clipboard.chmod(0o755)
+            server_path = str(root / 'menu.sock')
+            server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            server.bind(server_path)
+            server.listen(1)
+            server.settimeout(.2)
+            stop = threading.Event()
+            requests = []
+            errors = []
+
+            def serve():
+                while not stop.is_set():
+                    try:
+                        connection, _ = server.accept()
+                    except socket.timeout:
+                        continue
+                    except OSError:
+                        return
+                    with connection:
+                        request = json.loads(connection.makefile('rb').readline())
+                        requests.append(request)
+                        args = request['arguments']
+                        title = args[args.index('-p') + 1]
+                        if title == 'Select project inventory:':
+                            answer = '0'
+                        elif title == 'Select File or Action:':
+                            answer = '2. Main Project Prompts'
+                        elif title == 'Select target type:':
+                            answer = 'Theory Guide Sections' if target in ('theory', 'multiple') else 'FILEPATH.md files'
+                        elif title == 'Select section(s) or Done:':
+                            answer = '\n'.join(request['items']) if target == 'multiple' else request['items'][0]
+                        elif title == 'Main Project Prompts:':
+                            answer = action
+                        elif title == 'Select target file or Done:':
+                            answer = 'CPP | Solver | solver.cpp'
+                        elif title == 'Generate prompt:':
+                            answer = 'Generate prompt'
+                        else:
+                            errors.append(title)
+                            answer = ''
+                        connection.sendall((json.dumps({'value': answer}) + '\n').encode())
+
+            thread = threading.Thread(target=serve, daemon=True)
+            thread.start()
+            environment = os.environ.copy()
+            environment.update(PICKER_WORKER='1', PICKER_ACTIVE_WIN='', PICKER_SOCKET=server_path,
+                               PICKER_GENERATION='theory-flow', PATH=str(bindir) + ':' + environment['PATH'])
+            try:
+                process = subprocess.run(['bash', str(tool / 'prompt_picker.sh')], cwd=project,
+                                         env=environment, capture_output=True, text=True, timeout=10)
+            finally:
+                stop.set()
+                server.close()
+                thread.join(timeout=1)
+            self.assertFalse(errors)
+            self.assertEqual(process.returncode, 0, process.stderr)
+            return requests, process.stdout
+
+    def test_theory_target_opens_sections_without_file_selection(self):
+        requests, output = self.run_flow(True, 'theory')
+        titles = [request['arguments'][request['arguments'].index('-p') + 1] for request in requests]
+        self.assertEqual(titles, ['Select project inventory:', 'Select File or Action:',
+                                  'Main Project Prompts:', 'Select target type:', 'Select section(s) or Done:',
+                                  'Generate prompt:'])
+        self.assertNotIn('Theory Guide Sections', requests[1]['items'])
+        self.assertFalse(any('Transport' in item for item in requests[1]['items']))
+        self.assertIn('Transport', requests[4]['items'][0])
+        self.assertIn('Theory_Guide.md#transport', output)
+        self.assertIn('Section body.', output)
+        self.assertNotIn('Unrelated.', output)
+        self.assertNotIn('solver.cpp', output)
+
+    def test_existing_file_flow_with_and_without_theory_index(self):
+        for with_index, with_guide in ((False, True), (True, False), (True, True)):
+            with self.subTest(with_index=with_index, with_guide=with_guide):
+                requests, output = self.run_flow(with_index, 'file', with_guide)
+                root_items = requests[1]['items']
+                self.assertNotIn('Theory Guide Sections', root_items)
+                self.assertEqual(any('Select target type:' in request['arguments'] for request in requests),
+                                 with_index and with_guide)
+                file_request = next(request for request in requests
+                                    if 'Select target file or Done:' in request['arguments'])
+                self.assertEqual(file_request['items'], ['CPP | Solver | solver.cpp'])
+                self.assertIn('solver.cpp', output)
+                self.assertNotIn('Selected target section(s)', output)
+
+    def test_other_file_prompt_offers_sections(self):
+        requests, output = self.run_flow(True, 'theory', action='10. Fix Compiler / Syntax Issues')
+        self.assertTrue(any('Select target type:' in request['arguments'] for request in requests))
+        self.assertIn('Section body.', output)
+
+    def test_multiple_sections_include_both_bodies(self):
+        requests, output = self.run_flow(True, 'multiple')
+        self.assertIn('Section body.', output)
+        self.assertIn('Unrelated.', output)
+
+    def test_untargeted_prompt_skips_target_choice(self):
+        requests, output = self.run_flow(True, 'file', action='1. Update AGENTS.md File')
+        self.assertFalse(any('Select target type:' in request['arguments'] for request in requests))
+        self.assertNotIn('Selected target section(s)', output)
+
+
 class PromptOutputTests(unittest.TestCase):
     script = Path(__file__).resolve().parents[1] / 'prompt_picker' / 'prompt_picker.sh'
     inventory = ('MD | Readme | README.md\n'

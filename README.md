@@ -6,7 +6,7 @@ A small collection of Linux desktop helpers for building coding prompts and poli
 
 | Utility | What it does | Start here |
 | --- | --- | --- |
-| **Prompt Picker** | Uses a project's `FILEPATH.md` to build file-specific coding prompts, backup and restore prompts, and project maintenance and Git prompts. Copies the prompt to the clipboard and can paste it into the previously active window. | [`prompt_picker/README.md`](prompt_picker/README.md) |
+| **Prompt Picker** | Uses a project's `FILEPATH.md` to build file-specific coding prompts, backup and restore prompts, and project maintenance and Git prompts, including prompts to create and update a Theory Guide section manifest. Copies the prompt to the clipboard and can paste it into the previously active window. | [`prompt_picker/README.md`](prompt_picker/README.md) |
 | **Prompt Helper** | Opens an editable dialog, refines the text through the GapGPT API, then copies and pastes the result. | [`prompt_helper/README.md`](prompt_helper/README.md) |
 | **Translator** | Translates Persian or mixed text into polished academic English, or improves English text. The launcher reads clipboard text; the Python script also accepts an argument, piped input, or the X11 primary selection. | [`translator/README.md`](translator/README.md) |
 

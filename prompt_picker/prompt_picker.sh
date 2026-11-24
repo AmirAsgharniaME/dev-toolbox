@@ -121,6 +121,8 @@ CLASS_PIPELINE_ACTION="16. The 3-Stage C++ Performance Pipeline for Class"
 FUNCTION_PIPELINE_ACTION="17. The 3-Stage C++ Performance Pipeline for Function"
 BACKUP_FILE_ACTION="18. Backup File"
 RESTORE_FILE_ACTION="19. Restore File From Backup"
+THEORY_GUIDE_SECTIONS_ACTION="20. Create Theory Guide Sections"
+UPDATE_THEORY_GUIDE_SECTIONS_ACTION="21. Update Theory Guide Sections"
 TARGET_DESC=""
 SELECTED_COUNT=0
 CHOSEN_ACTION=""
@@ -228,6 +230,59 @@ Base the content on what is actually in the repository — the source tree, buil
 This file will be updated incrementally after future changes, so keep the structure stable and section-based, keep points short enough that a single item can be edited or removed, and include a dated change log at the end. Record decisions that still hold, not the discussion that led to them; refer to a file by path instead of copying its contents.
 
 Please rewrite the file to meet these requirements.
+PROMPT
+}
+
+make_theory_guide_sections_prompt() {
+    cat <<'PROMPT'
+Task: Parse `Theory_Guide.md` and generate an index tracking table inside `Theory_Guide_Sections.md`.
+
+Context & Objective:
+I am developing a custom C++ CFD library and writing its comprehensive theory guide in `Theory_Guide.md`.
+To programmatically manage, prompt, and update individual sections via automation scripts, I need an organized manifest file at `Theory_Guide_Sections.md`.
+
+Instructions for the assistant:
+1. Scan `Theory_Guide.md` located in the project root.
+2. Extract all heading sections (H1, H2, H3, H4).
+3. For each section, generate a clean entry inside a structured Markdown table in `Theory_Guide_Sections.md` with the following columns:
+   - `ID`: A hierarchical numerical index (e.g., 1.0, 1.1, 1.1.1) or unique kebab-case slug.
+   - `Section Title`: The exact heading text, hyperlinked as a Markdown anchor to the original file: `[Heading Text](Theory_Guide.md#anchor-slug)`.
+   - `Heading Level`: Indicate H1, H2, H3, etc.
+   - `Status`: Set to `In Progress` or `Draft` by default unless explicitly marked complete in the section content.
+   - `Last Updated`: Today's date (YYYY-MM-DD).
+   - `Scope / CFD Focus`: A short 3-7 word summary of what numerical/theoretical concepts or CFD equations are covered in this section.
+4. Keep the file strictly structured and consistent so that automated Python/Bash parsing scripts can read it via regex or markdown-table parsers.
+5. If `Theory_Guide_Sections.md` already exists, update/append new sections without overwriting custom notes or prior timestamps unless the heading itself changed.
+
+Output the updated content directly to `Theory_Guide_Sections.md`.
+PROMPT
+}
+
+make_update_theory_guide_sections_prompt() {
+    cat <<'PROMPT'
+Task: Incrementally synchronize `Theory_Guide_Sections.md` with recent changes in `Theory_Guide.md` using Git diff.
+
+Context:
+`Theory_Guide.md` contains the comprehensive CFD theory guide.
+`Theory_Guide_Sections.md` is a Markdown table index tracking each section (ID, Title/Anchor, Level, Status, Last Updated, Scope/Notes).
+Do NOT re-parse or rewrite the entire `Theory_Guide.md`. Only inspect changes.
+
+Instructions for the assistant:
+0. Safety & Backup Step:
+   - Before performing any modifications, make a backup copy of `Theory_Guide_Sections.md` as `Theory_Guide_Sections.md.bak` (or `Theory_Guide_Sections.bak.md`) in the same directory to prevent accidental data loss or corruption.
+
+1. Run or inspect `git diff HEAD -- Theory_Guide.md` (or inspect unstaged/staged git diff if uncommitted):
+   - Check which headings (lines starting with `#`, `##`, `###`, etc.) were added, modified, renamed, or deleted.
+   - Check which existing sections had their inner content modified (even if the heading text didn't change).
+
+2. Apply targeted updates to `Theory_Guide_Sections.md`:
+   - If a new heading was added: Insert a new row in the appropriate hierarchical position. Assign a matching ID, format the anchor link, set Status to `In Progress` or `Draft`, set `Last Updated` to today's date (YYYY-MM-DD), and generate a concise 3-7 word `Scope / CFD Focus`.
+   - If an existing heading was renamed/edited: Update the `Section Title` and anchor link for that row, preserving its custom notes/status, and update `Last Updated` to today's date.
+   - If a section was deleted: Remove the corresponding row from the table (or mark Status as `Archived`/`Removed`).
+   - If only the internal text/equations of an existing section were modified: Keep the row intact, but update its `Last Updated` column to today's date.
+   - If no headings or content related to a section changed: Leave that row and its previous `Last Updated` timestamp completely untouched.
+
+3. Save the updated table back to `Theory_Guide_Sections.md`. Ensure Markdown table formatting remains aligned and valid.
 PROMPT
 }
 
@@ -722,7 +777,7 @@ show_main_project_prompts_menu() {
     local file_path
 
     chosen_action=$(
-        printf '%s\n' "$AGENTS_ACTION" "$LIST_ACTION" "$CREATE_STATE_ACTION" "$AGENT_REPORT_ACTION" "$TASK_PLAN_ACTION" "$EXEC_TASK_ACTION" "$STATE_ACTION" "$FIX_MARKDOWN_ACTION" "$SCIENTIFIC_COPY_EDITOR_ACTION" "$FIX_COMPILER_ACTION" "$FIX_LOGIC_ACTION" "$REFACTOR_ACTION" "$REWRITE_ACTION" "$SYNC_ADAPT_ACTION" "$PROJECT_PIPELINE_ACTION" "$CLASS_PIPELINE_ACTION" "$FUNCTION_PIPELINE_ACTION" "$BACKUP_FILE_ACTION" "$RESTORE_FILE_ACTION" |
+        printf '%s\n' "$AGENTS_ACTION" "$LIST_ACTION" "$CREATE_STATE_ACTION" "$AGENT_REPORT_ACTION" "$TASK_PLAN_ACTION" "$EXEC_TASK_ACTION" "$STATE_ACTION" "$FIX_MARKDOWN_ACTION" "$SCIENTIFIC_COPY_EDITOR_ACTION" "$FIX_COMPILER_ACTION" "$FIX_LOGIC_ACTION" "$REFACTOR_ACTION" "$REWRITE_ACTION" "$SYNC_ADAPT_ACTION" "$PROJECT_PIPELINE_ACTION" "$CLASS_PIPELINE_ACTION" "$FUNCTION_PIPELINE_ACTION" "$BACKUP_FILE_ACTION" "$RESTORE_FILE_ACTION" "$THEORY_GUIDE_SECTIONS_ACTION" "$UPDATE_THEORY_GUIDE_SECTIONS_ACTION" |
             rofi -dmenu -i -no-custom -p "Main Project Prompts:" -matching fuzzy
     )
 
@@ -730,6 +785,8 @@ show_main_project_prompts_menu() {
         "$LIST_ACTION") copy_and_paste_prompt "$(make_list_prompt)" ;;
         "$AGENTS_ACTION") copy_and_paste_prompt "$(make_agents_prompt)" ;;
         "$CREATE_STATE_ACTION") copy_and_paste_prompt "$(make_create_state_prompt)" ;;
+        "$THEORY_GUIDE_SECTIONS_ACTION") copy_and_paste_prompt "$(make_theory_guide_sections_prompt)" ;;
+        "$UPDATE_THEORY_GUIDE_SECTIONS_ACTION") copy_and_paste_prompt "$(make_update_theory_guide_sections_prompt)" ;;
         "$AGENT_REPORT_ACTION") copy_and_paste_prompt "$(make_agent_report_prompt)" ;;
         "$TASK_PLAN_ACTION") copy_and_paste_prompt "$(make_task_plan_prompt)" ;;
         "$EXEC_TASK_ACTION") copy_and_paste_prompt "$(make_exec_task_prompt)" ;;

@@ -141,6 +141,8 @@ PIPELINE_SELECTED=0
 THEORY_GUIDE_INDEX=""
 SELECTED_THEORY_SECTIONS_BLOCK=""
 SELECTED_THEORY_SECTION_LINES=""
+SELECTED_TARGET_FILE_PATHS=""
+SELECTED_SOURCE_FILE_PATHS=""
 declare -A MODIFIED_PROMPTS=()
 
 make_delete_branch_message() {
@@ -349,18 +351,11 @@ PROMPT
 
 make_backup_file_prompt() {
     local file_paths="$1"
-    local remaining="$file_paths"
     local target_path
     local prompt=""
 
-    while [[ -n "$remaining" ]]; do
-        if [[ "$remaining" == *" And "* ]]; then
-            target_path="${remaining%% And *}"
-            remaining="${remaining#* And }"
-        else
-            target_path="$remaining"
-            remaining=""
-        fi
+    while IFS= read -r target_path; do
+        [[ -n "$target_path" ]] || continue
 
         [[ -n "$prompt" ]] && prompt+=$'\n\n'
         prompt+="Target file:
@@ -371,25 +366,18 @@ Create a backup of the target file in the same directory, using the original fil
 The backup must be an exact, byte-for-byte copy of the target file. Do not edit, reformat, convert, or otherwise alter its contents. If a backup with that name already exists, overwrite it with the new backup.
 
 Do not modify the target file or any other file. Afterward, confirm the backup’s path and that it was created successfully."
-    done
+    done <<< "$file_paths"
 
     printf '%s' "$prompt"
 }
 
 make_restore_file_prompt() {
     local file_paths="$1"
-    local remaining="$file_paths"
     local target_path
     local prompt=""
 
-    while [[ -n "$remaining" ]]; do
-        if [[ "$remaining" == *" And "* ]]; then
-            target_path="${remaining%% And *}"
-            remaining="${remaining#* And }"
-        else
-            target_path="$remaining"
-            remaining=""
-        fi
+    while IFS= read -r target_path; do
+        [[ -n "$target_path" ]] || continue
 
         [[ -n "$prompt" ]] && prompt+=$'\n\n'
         prompt+="Target file:
@@ -400,7 +388,7 @@ Restore the target file from its existing backup by replacing the target file wi
 Use the backup file in the same directory, named by appending \`.bak\` to the target file’s original name. Replace the target file with an exact copy of the backup. Do not modify, reformat, or otherwise alter the contents.
 
 Do not delete or modify the backup file. After restoring, confirm the target file’s path and that it was replaced successfully."
-    done
+    done <<< "$file_paths"
 
     printf '%s' "$prompt"
 }
@@ -410,26 +398,29 @@ make_fix_markdown_prompt() {
     local template
 
     template=$(cat <<'PROMPT'
-Apply the formatting rules in RULES_FILE to TARGET_FILE. Change only formatting, not content.
+Apply the formatting rules in RULES_FILE to the selected targets. Change only formatting, not content.
 
-TARGET_FILE: [put the file name here]
+TARGET_FILE(s): [put selected complete file path(s) here, if any]
 RULES_FILE: Markdown_Rules.md
 
 Procedure:
 1. Read RULES_FILE completely. Follow every rule in it, including the detection steps and the final checklist.
-2. Read TARGET_FILE completely. Find every place that breaks a rule in RULES_FILE.
+2. Read each selected complete file target fully, if any. For selected Theory Guide sections, inspect only the selected section range(s) listed below. Find every place within those targets that breaks a rule in RULES_FILE.
 3. Fix each place with the edit tool. Group nearby changes into one edit.
 4. Do not change any words, numbers, LaTeX content, or meaning. Do not change prose except where a rule requires it.
-5. Go through the checklist in RULES_FILE and confirm each item against TARGET_FILE. Fix any item that still fails.
-6. Edit TARGET_FILE directly. Do not print the file or the changes in the chat.
+5. Go through the checklist in RULES_FILE and confirm each item against the selected targets. Fix any item that still fails.
+6. Edit selected targets directly. Do not print the file or the changes in the chat.
 7. Reply in one short line: the number of fixes made, and any item in RULES_FILE that could not be applied, with its location and reason.
 PROMPT
 )
 
-    printf '%sTARGET_FILE: %s%s' \
-        "${template%%TARGET_FILE: \[put the file name here\]*}" \
-        "$target_file" \
-        "${template#*TARGET_FILE: \[put the file name here\]}"
+    if [[ -n "$target_file" ]]; then
+        printf '%sTARGET_FILE(s): listed in the selected target files below%s' \
+            "${template%%TARGET_FILE(s): \[put selected complete file path(s) here, if any\]*}" \
+            "${template#*TARGET_FILE(s): \[put selected complete file path(s) here, if any\]}"
+    else
+        printf '%s' "${template/TARGET_FILE(s): \[put selected complete file path(s) here, if any\]/}"
+    fi
 }
 
 make_scientific_copy_editor_prompt() {
@@ -437,9 +428,9 @@ make_scientific_copy_editor_prompt() {
     local template
 
     template=$(cat <<'PROMPT'
-Copy-edit TARGET_FILE for technical and scientific writing. Change only the wording and punctuation of prose, and make the whole file consistent. Follow RULES_FILE at all times.
+Copy-edit the selected targets for technical and scientific writing. Change only the wording and punctuation of prose, and make the selected targets consistent. Follow RULES_FILE at all times.
 
-TARGET_FILE: [put the file name here]
+TARGET_FILE(s): [put selected complete file path(s) here, if any]
 RULES_FILE: Markdown_Rules.md
 
 Priority:
@@ -448,10 +439,10 @@ Priority:
 - Never change the meaning of a sentence to make it read better.
 
 Procedure:
-1. Back up TARGET_FILE to TARGET_FILE + ".bak" before any edit.
-2. Read RULES_FILE and TARGET_FILE completely. List every symbol, term, and abbreviation, and note where each is defined.
+1. Before editing, make an exact `.bak` copy beside each selected complete target file. If section ranges are selected, also make one exact backup of their source file, `Theory_Guide.md`, as `Theory_Guide.md.bak`.
+2. Read RULES_FILE completely. Read each selected complete file target fully, if any; for selected Theory Guide sections, inspect only the selected section range(s) listed below. List every symbol, term, and abbreviation within the inspected targets, and note where each is defined.
 3. Make the prose fixes below with the edit tool. Group nearby changes into one edit.
-4. Edit TARGET_FILE directly. Do not print the file or the changes in the chat.
+4. Edit selected targets directly. Do not print the file or the changes in the chat.
 5. Reply with a short summary: the number of edits made, then one line for each flagged item, giving its location and reason.
 
 Prose fixes (text outside math):
@@ -478,30 +469,29 @@ Do not change:
 PROMPT
 )
 
-    printf '%sTARGET_FILE: %s%s' \
-        "${template%%TARGET_FILE: \[put the file name here\]*}" \
-        "$target_file" \
-        "${template#*TARGET_FILE: \[put the file name here\]}"
+    if [[ -n "$target_file" ]]; then
+        printf '%sTARGET_FILE(s): listed in the selected target files below%s' \
+            "${template%%TARGET_FILE(s): \[put selected complete file path(s) here, if any\]*}" \
+            "${template#*TARGET_FILE(s): \[put selected complete file path(s) here, if any\]}"
+    else
+        printf '%s' "${template/TARGET_FILE(s): \[put selected complete file path(s) here, if any\]/}"
+    fi
 }
 
 make_fix_compiler_prompt() {
-    local target_paths="$1"
-    printf 'Please review and fix all C++ compiler errors, syntax issues, and clangd warnings in the following: %s.' "$target_paths"
+    printf '%s' 'Please review and fix all C++ compiler errors, syntax issues, and clangd warnings for the selected targets.'
 }
 
 make_fix_logic_prompt() {
-    local target_paths="$1"
-    printf 'Please inspect the implementation, mathematical logic, and CFD/numerical algorithm (loops, signs, and boundary conditions) to fix bugs in: %s.' "$target_paths"
+    printf '%s' 'Please inspect the implementation, mathematical logic, and CFD/numerical algorithm (loops, signs, and boundary conditions) to fix bugs in the selected targets.'
 }
 
 make_refactor_prompt() {
-    local target_paths="$1"
-    printf 'Please refactor the following without altering its external behavior, applying modern C++ best practices and improving readability: %s.' "$target_paths"
+    printf '%s' 'Please refactor the selected targets without altering their external behavior, applying modern C++ best practices and improving readability.'
 }
 
 make_rewrite_prompt() {
-    local target_paths="$1"
-    printf 'Please rewrite and redesign the following from scratch with a clean, modern, and high-performance C++ design: %s.' "$target_paths"
+    printf '%s' 'Please rewrite and redesign the selected targets from scratch with a clean, modern, and high-performance C++ design.'
 }
 
 make_commit_changes_prompt() {
@@ -635,9 +625,11 @@ copy_and_paste_prompt() {
     local prompt="$1" require_confirmation="${2:-1}"
     local window_class="" paste_key="shift+Insert" clipboard_tool clipboard_text
     local primary_ok=0 focused_win=""
+    local target_reference_block
 
-    if [[ -n "$SELECTED_THEORY_SECTIONS_BLOCK" ]]; then
-        prompt+=$'\n\n'"$SELECTED_THEORY_SECTIONS_BLOCK"
+    target_reference_block=$(make_selected_target_reference_block)
+    if [[ -n "$target_reference_block" ]]; then
+        prompt+=$'\n\n'"$target_reference_block"
     fi
 
     if [[ -z "$prompt" ]]; then
@@ -848,7 +840,8 @@ PY
 
 make_theory_sections_block() {
     local selected_sections="$1"
-    local selected_line selected_index first=1 content block='Selected target section(s) in `Theory_Guide.md`:'
+    local selected_line selected_index first=1 source anchor source_file
+    local block='Selected Theory Guide section targets (ranges in `Theory_Guide.md`):'
     while IFS= read -r selected_line; do
         [[ -n "$selected_line" ]] || continue
         for selected_index in "${!THEORY_SECTION_MENU[@]}"; do
@@ -856,54 +849,82 @@ make_theory_sections_block() {
                 ((first)) || block+=$'\n'
                 block+=$'\n- Heading: `'"${THEORY_SECTION_TITLES[selected_index]}"'`'
                 block+=$'\n  Level: `'"${THEORY_SECTION_LEVELS[selected_index]}"'`'
-                block+=$'\n  Source: `'"${THEORY_SECTION_SOURCES[selected_index]}"'`'
-                content=$(python3 - "$(dirname -- "$THEORY_GUIDE_INDEX")/Theory_Guide.md" "${THEORY_SECTION_TITLES[selected_index]}" "${THEORY_SECTION_LEVELS[selected_index]}" "${THEORY_SECTION_SOURCES[selected_index]#*#}" <<'PY'
-import re
-import sys
-
-path, title, level, anchor = sys.argv[1:]
-with open(path, encoding="utf-8") as stream:
-    lines = stream.readlines()
-headings = []
-counts = {}
-fence = None
-for index, line in enumerate(lines):
-    marker = re.match(r"^ {0,3}(`{3,}|~{3,})", line)
-    if marker:
-        token = marker.group(1)
-        if fence is None:
-            fence = token
-        elif token[0] == fence[0] and len(token) >= len(fence):
-            fence = None
-        continue
-    if fence:
-        continue
-    match = re.match(r"^ {0,3}(#{1,6})\s+(.+?)\s*#*\s*$", line)
-    if not match:
-        continue
-    heading = match.group(2)
-    slug = re.sub(r"[^\w\- ]", "", heading.lower()).replace(" ", "-")
-    count = counts.get(slug, 0)
-    counts[slug] = count + 1
-    headings.append((index, len(match.group(1)), heading, slug + (f"-{count}" if count else "")))
-for position, (start, depth, heading, slug) in enumerate(headings):
-    if heading == title and depth == int(level[1]) and slug == anchor:
-        end = next((item[0] for item in headings[position + 1:] if item[1] <= depth), len(lines))
-        print("".join(lines[start:end]).rstrip())
-        break
-else:
-    print(f"Could not find section {title!r} ({anchor}) in {path}.", file=sys.stderr)
-    raise SystemExit(1)
-PY
-                ) || return 1
-                block+=$'\n  Content:\n\n'"$content"$'\n'
+                source="${THEORY_SECTION_SOURCES[selected_index]}"
+                source_file="${source%%#*}"
+                anchor="${source#*#}"
+                block+=$'\n  Source file: `'"$source_file"'`'
+                block+=$'\n  Anchor: `'"$anchor"'`'
+                block+=$'\n  Index link: `'"$source"'`'
                 first=0
                 break
             fi
         done
     done <<< "$selected_sections"
-    block+=$'\n\nInstruction:\nApply the selected prompt to the exact section(s) listed above. Read their current content from `Theory_Guide.md`; `Theory_Guide_Sections.md` is only an index. Do not modify unrelated sections.'
+    block+=$'\n\nSection instructions:\n- Treat `Theory_Guide_Sections.md` as an index only. Use each exact heading and anchor above to locate its section in `Theory_Guide.md`; do not read the entire guide just to locate it.\n- Inspect only the selected heading and its contents, ending immediately before the next heading of the same or higher level.\n- Apply the selected prompt only within the selected section range(s); do not modify unselected sections or unrelated files.\n- If selected ranges overlap because both a parent and nested section were chosen, preserve the explicit selection boundaries and apply any overlapping change only once.'
     printf '%s' "$block"
+}
+
+make_selected_target_reference_block() {
+    local block="" path target_path source_is_target=0
+
+    if [[ -n "$SELECTED_TARGET_FILE_PATHS" ]]; then
+        block='Selected target files (complete files):'
+        while IFS= read -r path; do
+            [[ -n "$path" ]] && block+=$'\n- `'"$path"'`'
+        done <<< "$SELECTED_TARGET_FILE_PATHS"
+        block+=$'\nInspect each listed file directly and make any requested edits as directed by the selected prompt.'
+    fi
+
+    if [[ -n "$SELECTED_THEORY_SECTIONS_BLOCK" ]]; then
+        [[ -n "$block" ]] && block+=$'\n\n'
+        block+="$SELECTED_THEORY_SECTIONS_BLOCK"
+    fi
+
+    if [[ -n "$SELECTED_TARGET_FILE_PATHS" && -n "$SELECTED_THEORY_SECTIONS_BLOCK" ]]; then
+        block+=$'\n\nBoth groups above are intended task targets. When the task requires them to be considered together, inspect their relevant contents and keep the changes consistent; do not treat either group as context only.'
+    fi
+
+    if [[ -n "$SELECTED_SOURCE_FILE_PATHS" ]]; then
+        [[ -n "$block" ]] && block+=$'\n\n'
+        block+='Selected source files (context for the selected task):'
+        while IFS= read -r path; do
+            [[ -n "$path" ]] || continue
+            block+=$'\n- `'"$path"'`'
+            while IFS= read -r target_path; do
+                [[ "$path" == "$target_path" ]] && source_is_target=1
+            done <<< "$SELECTED_TARGET_FILE_PATHS"
+        done <<< "$SELECTED_SOURCE_FILE_PATHS"
+        if ((source_is_target)); then
+            block+=$'\nUse these source files as context for the task. Any file also listed as a target file above remains an edit target; the other source files are context only.'
+        else
+            block+=$'\nUse these as source/context files only; the selected target files and section ranges above define the task targets.'
+        fi
+    fi
+
+    printf '%s' "$block"
+}
+
+make_target_selection_summary() {
+    local label="$1" summary=""
+
+    if [[ -n "$SELECTED_TARGET_FILES" ]]; then
+        summary="$label files: $SELECTED_TARGET_FILES"
+    fi
+    if [[ -n "$SELECTED_THEORY_SECTIONS_BLOCK" ]]; then
+        [[ -n "$summary" ]] && summary+='; '
+        summary+="$label Theory Guide sections selected"
+    fi
+
+    printf '%s' "$summary"
+}
+
+selected_theory_guide_file_is_targeted() {
+    local path
+    while IFS= read -r path; do
+        [[ -n "$path" ]] || continue
+        [[ "$(basename -- "$path")" == "Theory_Guide.md" ]] && return 0
+    done <<< "$SELECTED_TARGET_FILE_PATHS"
+    return 1
 }
 
 select_theory_guide_sections() {
@@ -941,13 +962,19 @@ select_prompt_target_files() {
     local selection_prompt="Select ${selection_role} file or Done:"
     local manual_prompt="Enter ${selection_role} file path or choose Done:"
 
+    SELECTED_TARGET_FILES=""
+    if [[ "$selection_role" == "target" ]]; then
+        SELECTED_TARGET_FILE_PATHS=""
+        SELECTED_THEORY_SECTIONS_BLOCK=""
+        SELECTED_THEORY_SECTION_LINES=""
+    elif [[ "$selection_role" == "source" ]]; then
+        SELECTED_SOURCE_FILE_PATHS=""
+    fi
+
     if [[ "$selection_role" == "target" && -n "$THEORY_GUIDE_INDEX" ]]; then
         # This is one collection session.  Each source's Enter key only
         # confirms that source and returns to the chooser; the chooser's
         # explicit Done item is the only way to finish the session.
-        SELECTED_TARGET_FILES=""
-        SELECTED_THEORY_SECTIONS_BLOCK=""
-        SELECTED_THEORY_SECTION_LINES=""
         selected_file_paths=""
         while true; do
             local target_kind source_options
@@ -987,7 +1014,7 @@ select_prompt_target_files() {
             esac
         done
         [[ -n "$SELECTED_TARGET_FILES$SELECTED_THEORY_SECTIONS_BLOCK" ]] || return 1
-        [[ -n "$SELECTED_TARGET_FILES" ]] || SELECTED_TARGET_FILES="Theory_Guide.md"
+        SELECTED_TARGET_FILE_PATHS="$selected_file_paths"
         return 0
     fi
 
@@ -1001,6 +1028,7 @@ select_prompt_target_files() {
             [[ -n "$selected_line" ]] || continue
             parse_menu_line "$selected_line" selected_type selected_label target_path
             if [[ -n "$targets" ]]; then targets+=" And $target_path"; else targets="$target_path"; fi
+            selected_file_paths+="${selected_file_paths:+$'\n'}$target_path"
         done <<< "$raw_selection"
     else
         while true; do
@@ -1011,11 +1039,17 @@ select_prompt_target_files() {
             [[ -n "$target_path" ]] || return 1
 
             if [[ -n "$targets" ]]; then targets+=" And $target_path"; else targets="$target_path"; fi
+            selected_file_paths+="${selected_file_paths:+$'\n'}$target_path"
         done
     fi
 
     [[ -n "$targets" ]] || return 1
     SELECTED_TARGET_FILES="$targets"
+    if [[ "$selection_role" == "target" ]]; then
+        SELECTED_TARGET_FILE_PATHS="$selected_file_paths"
+    elif [[ "$selection_role" == "source" ]]; then
+        SELECTED_SOURCE_FILE_PATHS="$selected_file_paths"
+    fi
     if [[ "$selection_role" == "remove" ]]; then
         printf '%s' "$targets"
     fi
@@ -1105,16 +1139,14 @@ show_markdown_prompts_menu() {
         "$FIX_MARKDOWN_ACTION")
             select_prompt_target_files || return 0
             file_path="$SELECTED_TARGET_FILES"
-            SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
-            [[ -z "$SELECTED_THEORY_SECTIONS_BLOCK" ]] || SELECTION_SUMMARY+="; Theory Guide Sections selected"
+            SELECTION_SUMMARY=$(make_target_selection_summary "target (Group 1 of 1)")
             copy_and_paste_prompt "$(make_fix_markdown_prompt "$file_path")"
             return 2
             ;;
         "$SCIENTIFIC_COPY_EDITOR_ACTION")
             select_prompt_target_files || return 0
             file_path="$SELECTED_TARGET_FILES"
-            SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
-            [[ -z "$SELECTED_THEORY_SECTIONS_BLOCK" ]] || SELECTION_SUMMARY+="; Theory Guide Sections selected"
+            SELECTION_SUMMARY=$(make_target_selection_summary "target (Group 1 of 1)")
             copy_and_paste_prompt "$(make_scientific_copy_editor_prompt "$file_path")"
             return 2
             ;;
@@ -1131,31 +1163,28 @@ show_cpp_prompts_menu() {
         "$FIX_COMPILER_ACTION")
             select_prompt_target_files || return 0
             file_path="$SELECTED_TARGET_FILES"
-            SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
-            [[ -z "$SELECTED_THEORY_SECTIONS_BLOCK" ]] || SELECTION_SUMMARY+="; Theory Guide Sections selected"
+            SELECTION_SUMMARY=$(make_target_selection_summary "target (Group 1 of 1)")
             copy_and_paste_prompt "$(make_fix_compiler_prompt "$file_path")"
             return 2
             ;;
         "$REFACTOR_ACTION")
             select_prompt_target_files || return 0
             file_path="$SELECTED_TARGET_FILES"
-            SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
-            [[ -z "$SELECTED_THEORY_SECTIONS_BLOCK" ]] || SELECTION_SUMMARY+="; Theory Guide Sections selected"
+            SELECTION_SUMMARY=$(make_target_selection_summary "target (Group 1 of 1)")
             copy_and_paste_prompt "$(make_refactor_prompt "$file_path")"
             return 2
             ;;
         "$REWRITE_ACTION")
             select_prompt_target_files || return 0
             file_path="$SELECTED_TARGET_FILES"
-            SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
-            [[ -z "$SELECTED_THEORY_SECTIONS_BLOCK" ]] || SELECTION_SUMMARY+="; Theory Guide Sections selected"
+            SELECTION_SUMMARY=$(make_target_selection_summary "target (Group 1 of 1)")
             copy_and_paste_prompt "$(make_rewrite_prompt "$file_path")"
             return 2
             ;;
         "$CLASS_PIPELINE_ACTION"|"$FUNCTION_PIPELINE_ACTION")
             select_prompt_target_files || return 0
             file_path="$SELECTED_TARGET_FILES"
-            SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
+            SELECTION_SUMMARY=$(make_target_selection_summary "target (Group 1 of 1)")
             CHOSEN_ACTION="$chosen_action"
             TARGET_DESC="$file_path"
             SELECTED_COUNT=1
@@ -1179,15 +1208,14 @@ show_cfd_prompts_menu() {
         "$FIX_LOGIC_ACTION")
             select_prompt_target_files || return 0
             file_path="$SELECTED_TARGET_FILES"
-            SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
-            [[ -z "$SELECTED_THEORY_SECTIONS_BLOCK" ]] || SELECTION_SUMMARY+="; Theory Guide Sections selected"
+            SELECTION_SUMMARY=$(make_target_selection_summary "target (Group 1 of 1)")
             copy_and_paste_prompt "$(make_fix_logic_prompt "$file_path")"
             return 2
             ;;
         "$PROJECT_PIPELINE_ACTION")
             select_prompt_target_files || return 0
             file_path="$SELECTED_TARGET_FILES"
-            SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
+            SELECTION_SUMMARY=$(make_target_selection_summary "target (Group 1 of 1)")
             CHOSEN_ACTION="$chosen_action"
             TARGET_DESC="$file_path"
             SELECTED_COUNT=1
@@ -1213,25 +1241,38 @@ show_file_operations_menu() {
             SELECTION_SUMMARY=""; SELECTION_GROUP_COUNT=2; SELECTION_GROUP_INDEX=1
             select_prompt_target_files "target" || return 0
             file_path="$SELECTED_TARGET_FILES"
+            SELECTION_SUMMARY=$(make_target_selection_summary "target (Group 1 of 2)")
             SELECTION_GROUP_INDEX=2
             select_prompt_target_files "source" || return 0
             source_paths="$SELECTED_TARGET_FILES"
-            SELECTION_SUMMARY="target (Group 1 of 2): $file_path; source (Group 2 of 2): $source_paths"
-            copy_and_paste_prompt "Please update and sync $file_path based on the interface and changes introduced in $source_paths."
+            SELECTION_SUMMARY+="; source (Group 2 of 2): $source_paths"
+            copy_and_paste_prompt "Please update and sync the selected target files and/or Theory Guide section ranges based on the interface and changes introduced in the selected source files."
             ;;
         "$BACKUP_FILE_ACTION")
             select_prompt_target_files || return 0
             file_path="$SELECTED_TARGET_FILES"
-            SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
-            [[ -z "$SELECTED_THEORY_SECTIONS_BLOCK" ]] || SELECTION_SUMMARY+="; Theory Guide Sections selected"
-            copy_and_paste_prompt "$(make_backup_file_prompt "$file_path")"
+            SELECTION_SUMMARY=$(make_target_selection_summary "target (Group 1 of 1)")
+            local backup_prompt
+            backup_prompt=$(make_backup_file_prompt "$SELECTED_TARGET_FILE_PATHS")
+            if [[ -z "$SELECTED_TARGET_FILE_PATHS" && -n "$SELECTED_THEORY_SECTIONS_BLOCK" ]]; then
+                backup_prompt='Create an exact, byte-for-byte backup of `Theory_Guide.md` as `Theory_Guide.md.bak` in the same directory. Do not edit the guide or any other file. Confirm the backup path and success.'
+            elif [[ -n "$SELECTED_THEORY_SECTIONS_BLOCK" ]] && ! selected_theory_guide_file_is_targeted; then
+                backup_prompt+=$'\n\nAlso create one exact, byte-for-byte backup of `Theory_Guide.md` as `Theory_Guide.md.bak` for the selected section ranges. Do not edit the guide or any other file.'
+            fi
+            copy_and_paste_prompt "$backup_prompt"
             ;;
         "$RESTORE_FILE_ACTION")
             select_prompt_target_files || return 0
             file_path="$SELECTED_TARGET_FILES"
-            SELECTION_SUMMARY="target (Group 1 of 1): $file_path"
-            [[ -z "$SELECTED_THEORY_SECTIONS_BLOCK" ]] || SELECTION_SUMMARY+="; Theory Guide Sections selected"
-            copy_and_paste_prompt "$(make_restore_file_prompt "$file_path")"
+            SELECTION_SUMMARY=$(make_target_selection_summary "target (Group 1 of 1)")
+            local restore_prompt
+            restore_prompt=$(make_restore_file_prompt "$SELECTED_TARGET_FILE_PATHS")
+            if [[ -z "$SELECTED_TARGET_FILE_PATHS" && -n "$SELECTED_THEORY_SECTIONS_BLOCK" ]]; then
+                restore_prompt='Restore only the selected Theory Guide section range(s) in `Theory_Guide.md` from `Theory_Guide.md.bak`. Locate each section by its exact heading and anchor, inspect only that selected range in the guide and backup, and replace only that range. Preserve every unselected section and do not modify another file. If selected ranges overlap, restore the overlapping content only once.'
+            elif [[ -n "$SELECTED_THEORY_SECTIONS_BLOCK" ]] && ! selected_theory_guide_file_is_targeted; then
+                restore_prompt+=$'\n\nFor selected section ranges whose source file is not also listed as a complete target file, restore only those ranges from `Theory_Guide.md.bak`, preserving all unselected sections. If a source file is already a complete target file, its complete-file restore covers its selected sections; do not restore those ranges a second time.'
+            fi
+            copy_and_paste_prompt "$restore_prompt"
             ;;
     esac
     return 2
@@ -1785,16 +1826,12 @@ PROMPT
         esac
         ;;
     "1. None (Just Paste File Path)"|"3. Done")
-        FINAL_PROMPT="Selected files: $TARGET_DESC."
+        FINAL_PROMPT=""
         ;;
     *)
         exit 1
         ;;
 esac
-
-if ((SELECTED_COUNT > 1)) && [[ "$CHOSEN_ACTION" == *"Performance Pipeline"* ]]; then
-    FINAL_PROMPT+=$'\n\n'"Selected files: $TARGET_DESC."
-fi
 
 # Copy the prompt to the clipboard and paste it into the original window.
 copy_and_paste_prompt "$FINAL_PROMPT" || exit 1

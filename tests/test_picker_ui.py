@@ -213,7 +213,7 @@ class PickerHistoryTests(unittest.TestCase):
 
 
 class TheoryTargetFlowTests(unittest.TestCase):
-    def run_flow(self, with_index, target, with_guide=True, action='8. Fix Markdown'):
+    def run_flow(self, with_index, target, with_guide=True, action='6. Markdown'):
         script = Path(__file__).resolve().parents[1] / 'prompt_picker' / 'prompt_picker.sh'
         with tempfile.TemporaryDirectory(prefix='picker-theory-flow-') as tmp:
             root = Path(tmp)
@@ -223,7 +223,8 @@ class TheoryTargetFlowTests(unittest.TestCase):
             project.mkdir()
             tool.mkdir()
             bindir.mkdir()
-            (project / 'FILEPATH.md').write_text('CPP | Solver | solver.cpp\n')
+            (project / 'FILEPATH.md').write_text(
+                'CPP | Solver | solver.cpp\nMD | Notes | notes.md\n')
             (tool / 'FILEPATH.md').write_text('MD | Other | other.md\n')
             if with_index:
                 (project / 'Theory_Guide_Sections.md').write_text(
@@ -246,6 +247,7 @@ class TheoryTargetFlowTests(unittest.TestCase):
             stop = threading.Event()
             requests = []
             errors = []
+            selected_sources = []
 
             def serve():
                 while not stop.is_set():
@@ -265,16 +267,40 @@ class TheoryTargetFlowTests(unittest.TestCase):
                         elif title == 'Select File or Action:':
                             answer = '2. Prompts'
                         elif title == 'Select target type:':
-                            answer = 'Theory Guide Sections' if target in ('theory', 'multiple') else 'FILEPATH.md files'
+                            if target == 'theory':
+                                answer = 'Theory Guide Sections' if not selected_sources else 'Done'
+                            elif target == 'multiple':
+                                answer = 'Theory Guide Sections' if not selected_sources else 'Done'
+                            elif target in ('theory_then_file', 'file_then_theory'):
+                                sequence = (['Theory Guide Sections', 'FILEPATH.md files', 'Done']
+                                            if target == 'theory_then_file' else
+                                            ['FILEPATH.md files', 'Theory Guide Sections', 'Done'])
+                                answer = sequence[len(selected_sources)]
+                            elif target in ('one_source', 'file'):
+                                answer = 'FILEPATH.md files' if not selected_sources else 'Done'
+                            elif target == 'file_repeat':
+                                answer = 'FILEPATH.md files' if len(selected_sources) < 2 else 'Done'
+                            else:
+                                answer = 'FILEPATH.md files'
+                            if answer in ('Theory Guide Sections', 'FILEPATH.md files'):
+                                selected_sources.append(answer)
                         elif title == 'Select section(s) or Done:':
-                            answer = '\n'.join(request['items']) if target == 'multiple' else request['items'][0]
+                            answer = ('\n'.join(request['items']) if target == 'multiple' else
+                                      '\n'.join(request['items']) if target == 'theory_then_file' else
+                                      request['items'][0])
                         elif title == 'Prompts:':
-                            answer = action
+                            answer = '7. C++' if 'Compiler' in action else action
+                        elif title == 'Markdown:':
+                            answer = 'Fix'
+                        elif title == 'C++:':
+                            answer = 'Fix Compiler / Syntax Issues' if 'Compiler' in action else action
                         elif title == 'STATE.md:':
                             answer = action
                         elif title == 'Select target file or Done:':
-                            answer = 'CPP | Solver | solver.cpp'
-                        elif title == 'Generate prompt:':
+                            answer = ('CPP | Solver | solver.cpp\nMD | Notes | notes.md'
+                                      if target in ('theory_then_file', 'file_then_theory', 'one_source') else
+                                      'CPP | Solver | solver.cpp')
+                        elif title in ('Generate prompt:', 'Prompt action:'):
                             answer = 'Generate prompt'
                         else:
                             errors.append(title)
@@ -301,11 +327,18 @@ class TheoryTargetFlowTests(unittest.TestCase):
         requests, output = self.run_flow(True, 'theory')
         titles = [request['arguments'][request['arguments'].index('-p') + 1] for request in requests]
         self.assertEqual(titles, ['Select project inventory:', 'Select File or Action:',
-                                  'Prompts:', 'Select target type:', 'Select section(s) or Done:',
-                                  'Generate prompt:'])
+                                  'Prompts:', 'Markdown:', 'Select target type:',
+                                  'Select section(s) or Done:', 'Select target type:',
+                                  'Prompt action:'])
         self.assertNotIn('Theory Guide Sections', requests[1]['items'])
         self.assertFalse(any('Transport' in item for item in requests[1]['items']))
-        self.assertIn('Transport', requests[4]['items'][0])
+        source_choice = next(request for request in requests
+                             if 'Select target type:' in request['arguments'])
+        self.assertEqual(source_choice['items'],
+                         ['FILEPATH.md files', 'Theory Guide Sections', 'Done'])
+        section_request = next(request for request in requests
+                               if 'Select section(s) or Done:' in request['arguments'])
+        self.assertIn('Transport', section_request['items'][0])
         self.assertIn('Theory_Guide.md#transport', output)
         self.assertIn('Section body.', output)
         self.assertNotIn('Unrelated.', output)
@@ -321,7 +354,8 @@ class TheoryTargetFlowTests(unittest.TestCase):
                                  with_index and with_guide)
                 file_request = next(request for request in requests
                                     if 'Select target file or Done:' in request['arguments'])
-                self.assertEqual(file_request['items'], ['CPP | Solver | solver.cpp'])
+                self.assertEqual(file_request['items'], ['CPP | Solver | solver.cpp',
+                                                        'MD | Notes | notes.md'])
                 self.assertIn('solver.cpp', output)
                 self.assertNotIn('Selected target section(s)', output)
 
@@ -334,6 +368,37 @@ class TheoryTargetFlowTests(unittest.TestCase):
         requests, output = self.run_flow(True, 'multiple')
         self.assertIn('Section body.', output)
         self.assertIn('Unrelated.', output)
+
+    def test_theory_then_files_returns_to_source_choice_and_keeps_both(self):
+        requests, output = self.run_flow(True, 'theory_then_file')
+        titles = [request['arguments'][request['arguments'].index('-p') + 1]
+                  for request in requests]
+        self.assertEqual(titles.count('Select target type:'), 3)
+        self.assertLess(titles.index('Select section(s) or Done:'),
+                        len(titles) - 2)
+        self.assertIn('solver.cpp', output)
+        self.assertIn('notes.md', output)
+        self.assertIn('Section body.', output)
+        self.assertIn('Unrelated.', output)
+
+    def test_files_then_theory_keeps_both(self):
+        requests, output = self.run_flow(True, 'file_then_theory')
+        self.assertIn('solver.cpp', output)
+        self.assertIn('notes.md', output)
+        self.assertIn('Section body.', output)
+
+    def test_single_source_selection_finishes_only_after_done(self):
+        requests, output = self.run_flow(True, 'one_source')
+        titles = [request['arguments'][request['arguments'].index('-p') + 1]
+                  for request in requests]
+        self.assertEqual(titles.count('Select target type:'), 2)
+        self.assertLess(titles.index('Select target file or Done:'),
+                        titles.index('Prompt action:'))
+        self.assertIn('solver.cpp', output)
+
+    def test_reselecting_a_file_does_not_duplicate_it(self):
+        requests, output = self.run_flow(True, 'file_repeat')
+        self.assertEqual(output.count('solver.cpp'), 1)
 
     def test_untargeted_prompt_skips_target_choice(self):
         requests, output = self.run_flow(True, 'file', action='1. Update AGENTS.md File')

@@ -140,6 +140,7 @@ CHOSEN_ACTION=""
 PIPELINE_SELECTED=0
 THEORY_GUIDE_INDEX=""
 SELECTED_THEORY_SECTIONS_BLOCK=""
+SELECTED_THEORY_SECTION_LINES=""
 declare -A MODIFIED_PROMPTS=()
 
 make_delete_branch_message() {
@@ -906,15 +907,24 @@ PY
 }
 
 select_theory_guide_sections() {
-    local selected_sections
+    local selected_sections selected_line
     load_theory_guide_sections "$THEORY_GUIDE_INDEX" || {
         report_prompt_error "Could not load sections from $THEORY_GUIDE_INDEX. Fix the malformed index rows and try again."
         return 1
     }
     selected_sections=$(printf '%s\n' "${THEORY_SECTION_MENU[@]}" |
         rofi -dmenu -i -no-custom -multi-select -group "Theory Guide sections" -p "Select section(s) or Done:" -matching normal) || return 1
-    [[ -n "$selected_sections" ]] || return 1
-    SELECTED_THEORY_SECTIONS_BLOCK=$(make_theory_sections_block "$selected_sections") || return 1
+    # A successful dialog with no rows selected is an empty confirmation. Keep
+    # the accumulated selection unchanged and let the source chooser continue.
+    [[ -n "$selected_sections" ]] || return 2
+    while IFS= read -r selected_line; do
+        [[ -n "$selected_line" ]] || continue
+        case $'\n'"$SELECTED_THEORY_SECTION_LINES"$'\n' in
+            *$'\n'"$selected_line"$'\n'*) ;;
+            *) SELECTED_THEORY_SECTION_LINES+="${SELECTED_THEORY_SECTION_LINES:+$'\n'}$selected_line" ;;
+        esac
+    done <<< "$selected_sections"
+    SELECTED_THEORY_SECTIONS_BLOCK=$(make_theory_sections_block "$SELECTED_THEORY_SECTION_LINES") || return 1
     [[ -n "$SELECTED_THEORY_SECTIONS_BLOCK" ]]
 }
 
@@ -927,23 +937,58 @@ show_delete_branch_message() {
 select_prompt_target_files() {
     local selection_role="${1:-target}"
     local selected_line selected_type selected_label target_path
-    local targets="" raw_selection group_label
+    local targets="" raw_selection group_label selected_file_paths=""
     local selection_prompt="Select ${selection_role} file or Done:"
     local manual_prompt="Enter ${selection_role} file path or choose Done:"
 
     if [[ "$selection_role" == "target" && -n "$THEORY_GUIDE_INDEX" ]]; then
-        local target_kind
-        target_kind=$(printf '%s\n' "FILEPATH.md files" "$THEORY_GUIDE_INDEX_ACTION" |
-            rofi -dmenu -i -no-custom -p "Select target type:" -matching normal) || return 1
-        case "$target_kind" in
-            "$THEORY_GUIDE_INDEX_ACTION")
-                select_theory_guide_sections || return 1
-                SELECTED_TARGET_FILES="Theory_Guide.md"
-                return 0
-                ;;
-            "FILEPATH.md files") ;;
-            *) return 1 ;;
-        esac
+        # This is one collection session.  Each source's Enter key only
+        # confirms that source and returns to the chooser; the chooser's
+        # explicit Done item is the only way to finish the session.
+        SELECTED_TARGET_FILES=""
+        SELECTED_THEORY_SECTIONS_BLOCK=""
+        SELECTED_THEORY_SECTION_LINES=""
+        selected_file_paths=""
+        while true; do
+            local target_kind source_options
+            source_options=$(printf '%s\n' "FILEPATH.md files" "$THEORY_GUIDE_INDEX_ACTION")
+            if [[ -n "$selected_file_paths$SELECTED_THEORY_SECTION_LINES" ]]; then
+                source_options+=$'\nDone'
+            fi
+            target_kind=$(printf '%s\n' "$source_options" |
+                rofi -dmenu -i -no-custom -p "Select target type:" -matching normal) || return 1
+            case "$target_kind" in
+                "$THEORY_GUIDE_INDEX_ACTION")
+                    if select_theory_guide_sections; then
+                        :
+                    else
+                        local selection_status=$?
+                        ((selection_status == 2)) || return 1
+                    fi
+                    ;;
+                "FILEPATH.md files")
+                    raw_selection=$(printf '%s\n' "$FILE_MENU_LIST" |
+                        rofi -dmenu -i -no-custom -multi-select -group "$selection_role" -p "$selection_prompt" -matching normal) || return 1
+                    [[ -n "$raw_selection" ]] || continue
+                    while IFS= read -r selected_line; do
+                        [[ -n "$selected_line" ]] || continue
+                        parse_menu_line "$selected_line" selected_type selected_label target_path
+                        case $'\n'"$selected_file_paths"$'\n' in
+                            *$'\n'"$target_path"$'\n'*) ;;
+                            *)
+                                selected_file_paths+="${selected_file_paths:+$'\n'}$target_path"
+                                SELECTED_TARGET_FILES+="${SELECTED_TARGET_FILES:+ And }$target_path"
+                                ;;
+                        esac
+                    done <<< "$raw_selection"
+                    ;;
+                Done) break ;;
+                *) return 1 ;;
+            esac
+        done
+        [[ -n "$SELECTED_TARGET_FILES$SELECTED_THEORY_SECTIONS_BLOCK" ]] || return 1
+        [[ -n "$SELECTED_TARGET_FILES" ]] || SELECTED_TARGET_FILES="Theory_Guide.md"
+        return 0
     fi
 
     group_label="$selection_role (Group ${SELECTION_GROUP_INDEX:-1} of ${SELECTION_GROUP_COUNT:-1})"
